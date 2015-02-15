@@ -25,6 +25,12 @@ package org.numenta.nupic.research;
 import gnu.trove.list.array.TDoubleArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.set.hash.TIntHashSet;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Random;
+
 import org.numenta.nupic.Connections;
 import org.numenta.nupic.model.Column;
 import org.numenta.nupic.model.Pool;
@@ -33,11 +39,6 @@ import org.numenta.nupic.util.Condition;
 import org.numenta.nupic.util.SparseBinaryMatrix;
 import org.numenta.nupic.util.SparseMatrix;
 import org.numenta.nupic.util.SparseObjectMatrix;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
 
 
 /**
@@ -627,7 +628,7 @@ public class SpatialPooler {
      * @return
      */
     public double[] initPermanence(Connections c, int[] potentialPool, int index, double connectedPct) {
-    	int count = (int)Math.round((double)potentialPool.length * connectedPct);
+    	int count = (int)Math.round(potentialPool.length * connectedPct);
         TIntHashSet pick = new TIntHashSet();
         Random random = c.getRandom();
         while(pick.size() < count) {
@@ -953,7 +954,7 @@ public class SpatialPooler {
      */
     public void updateBoostFactors(Connections c) {
     	double[] activeDutyCycles = c.getActiveDutyCycles();
-    	double[] minActiveDutyCycles = c.getMinActiveDutyCycles();
+    	final double[] minActiveDutyCycles = c.getMinActiveDutyCycles();
     	
     	//Indexes of values > 0
     	int[] mask = ArrayUtils.where(minActiveDutyCycles, ArrayUtils.GREATER_THAN_0);
