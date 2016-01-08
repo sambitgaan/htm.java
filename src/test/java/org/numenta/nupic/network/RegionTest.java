@@ -5,15 +5,15 @@
  * following terms and conditions apply:
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
+ * it under the terms of the GNU Affero Public License version 3 as
  * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
+ * See the GNU Affero Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero Public License
  * along with this program.  If not, see http://www.gnu.org/licenses.
  *
  * http://numenta.org/licenses/
@@ -37,6 +37,8 @@ import org.junit.Test;
 import org.numenta.nupic.Parameters;
 import org.numenta.nupic.Parameters.KEY;
 import org.numenta.nupic.algorithms.Anomaly;
+import org.numenta.nupic.algorithms.SpatialPooler;
+import org.numenta.nupic.algorithms.TemporalMemory;
 import org.numenta.nupic.algorithms.Anomaly.Mode;
 import org.numenta.nupic.datagen.ResourceLocator;
 import org.numenta.nupic.encoders.MultiEncoder;
@@ -44,10 +46,9 @@ import org.numenta.nupic.network.sensor.FileSensor;
 import org.numenta.nupic.network.sensor.Sensor;
 import org.numenta.nupic.network.sensor.SensorParams;
 import org.numenta.nupic.network.sensor.SensorParams.Keys;
-import org.numenta.nupic.research.SpatialPooler;
-import org.numenta.nupic.research.TemporalMemory;
 import org.numenta.nupic.util.MersenneTwister;
 
+import rx.Observer;
 import rx.Subscriber;
 
 
@@ -74,6 +75,49 @@ public class RegionTest {
             assertTrue(e.getClass().isAssignableFrom(IllegalStateException.class));
             assertEquals("Cannot add Layers when Region has already been closed.", e.getMessage());
         }
+    }
+    
+    @Test
+    public void testResetMethod() {
+        Parameters p = NetworkTestHarness.getParameters();
+        Region r1 = Network.createRegion("r1");
+        r1.add(Network.createLayer("l1", p).add(new TemporalMemory()));
+        try {
+            r1.reset();
+            assertTrue(r1.lookup("l1").hasTemporalMemory());
+        }catch(Exception e) {
+            fail();
+        }
+        
+        r1 = Network.createRegion("r1");
+        r1.add(Network.createLayer("l1", p).add(new SpatialPooler()));
+        try {
+            r1.reset();
+            assertFalse(r1.lookup("l1").hasTemporalMemory());
+        }catch(Exception e) {
+            fail();
+        }
+    }
+    
+    @Test
+    public void testResetRecordNum() {
+        Parameters p = NetworkTestHarness.getParameters();
+        Region r1 = Network.createRegion("r1");
+        r1.add(Network.createLayer("l1", p).add(new TemporalMemory()));
+        r1.observe().subscribe(new Observer<Inference>() {
+            @Override public void onCompleted() {}
+            @Override public void onError(Throwable e) { e.printStackTrace(); }
+            @Override public void onNext(Inference output) {
+                System.out.println("output = " + Arrays.toString(output.getSDR()));
+            }
+        });
+        
+        r1.compute(new int[] { 2,3,4 });
+        r1.compute(new int[] { 2,3,4 });
+        assertEquals(1, r1.lookup("l1").getRecordNum());
+        
+        r1.resetRecordNum();
+        assertEquals(0, r1.lookup("l1").getRecordNum());
     }
     
     @Test
@@ -157,7 +201,7 @@ public class RegionTest {
         r1.observe().subscribe(new Subscriber<Inference>() {
             int seq = 0;
             @Override public void onCompleted() {
-                System.out.println("onCompleted() called");
+//                System.out.println("onCompleted() called");
             }
             @Override public void onError(Throwable e) { e.printStackTrace(); }
             @Override public void onNext(Inference i) {
@@ -165,7 +209,7 @@ public class RegionTest {
                     isHalted = true;
                 }
                 seq++;
-                System.out.println("output: " + i.getSDR());
+//                System.out.println("output: " + i.getSDR());
             }
         });
         
@@ -246,7 +290,7 @@ public class RegionTest {
      */
     @Test
     public void testMultiLayerAssemblyNoSensor() {
-        Parameters p = NetworkTestHarness.getParameters();
+        Parameters p = NetworkTestHarness.getParameters().copy();
         p = p.union(NetworkTestHarness.getDayDemoTestEncoderParams());
         p.setParameterByKey(KEY.COLUMN_DIMENSIONS, new int[] { 30 });
         p.setParameterByKey(KEY.SYN_PERM_INACTIVE_DEC, 0.1);
@@ -283,9 +327,9 @@ public class RegionTest {
             @Override public void onError(Throwable e) { e.printStackTrace(); }
             @Override public void onNext(Inference i) {
                 // UNCOMMENT TO VIEW STABILIZATION OF PREDICTED FIELDS
-//                System.out.println("Day: " + r1.getInput() + " - predictions: " + Arrays.toString(i.getPreviousPrediction()) +
-//                    "   -   " + Arrays.toString(i.getSparseActives()) + " - " + 
-//                    ((int)Math.rint(((Number)i.getClassification("dayOfWeek").getMostProbableValue(1)).doubleValue())));
+                System.out.println("Day: " + r1.getInput() + " - predictive cells: " + i.getPreviousPredictiveCells() +
+                    "   -   " + Arrays.toString(i.getFeedForwardSparseActives()) + " - " + 
+                    ((int)Math.rint(((Number)i.getClassification("dayOfWeek").getMostProbableValue(1)).doubleValue())));
             }
         });
        
@@ -297,7 +341,11 @@ public class RegionTest {
                 multiInput.put("dayOfWeek", j);
                 r1.compute(multiInput);
             }
+            r1.reset();
         }
+        
+        r1.setLearn(false);
+        r1.reset();
         
         // Test that we get proper output after prediction stabilization
         r1.observe().subscribe(new Subscriber<Inference>() {
@@ -313,90 +361,50 @@ public class RegionTest {
         
     }
     
-    /**
-     * Tests that a Region can be assembled containing multiple layers
-     * with an underlying FileSensor and started and that it produces the proper emissions.
-     */
     @Test
-    public void testMultiLayerAssemblyWithSensor() {
-        Parameters p = NetworkTestHarness.getParameters();
+    public void testIsLearn() {
+        Parameters p = NetworkTestHarness.getParameters().copy();
         p = p.union(NetworkTestHarness.getDayDemoTestEncoderParams());
+        p.setParameterByKey(KEY.COLUMN_DIMENSIONS, new int[] { 30 });
+        p.setParameterByKey(KEY.SYN_PERM_INACTIVE_DEC, 0.1);
+        p.setParameterByKey(KEY.SYN_PERM_ACTIVE_INC, 0.1);
+        p.setParameterByKey(KEY.SYN_PERM_TRIM_THRESHOLD, 0.05);
+        p.setParameterByKey(KEY.SYN_PERM_CONNECTED, 0.4);
+        p.setParameterByKey(KEY.MAX_BOOST, 10.0);
+        p.setParameterByKey(KEY.DUTY_CYCLE_PERIOD, 7);
         p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
         
         Map<String, Object> params = new HashMap<>();
         params.put(KEY_MODE, Mode.PURE);
-        
         Network n = Network.create("test network", p)
             .add(Network.createRegion("r1")
-            .add(Network.createLayer("1", p)
-                .alterParameter(KEY.AUTO_CLASSIFY, Boolean.TRUE))
-            .add(Network.createLayer("2", p)
-                .add(Anomaly.create(params)))
-            .add(Network.createLayer("3", p)
-                .add(new TemporalMemory()))
-            .add(Network.createLayer("4", p)
-                .add(Sensor.create(FileSensor::create, SensorParams.create(
-                    Keys::path, "", ResourceLocator.path("days-of-week.csv"))))
-                .add(new SpatialPooler()))
-            .connect("1", "2")
-            .connect("2", "3")
-            .connect("3", "4"));
+                .add(Network.createLayer("1", p)
+                    .alterParameter(KEY.AUTO_CLASSIFY, Boolean.TRUE))
+                .add(Network.createLayer("2", p)
+                    .add(Anomaly.create(params)))
+                .add(Network.createLayer("3", p)
+                    .add(new TemporalMemory()))
+                .add(Network.createLayer("4", p)
+                    .add(new SpatialPooler())
+                    .add(MultiEncoder.builder().name("").build()))
+                .connect("1", "2")
+                .connect("2", "3")
+                .connect("3", "4"));
         
-        n.lookup("r1").observe().subscribe(new Subscriber<Inference>() {
-            int idx = 0;
-            
-            @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { e.printStackTrace(); }
-            @Override public void onNext(Inference i) {
-                // Test Classifier and Anomaly output
-                switch(idx) {
-                    case 0: assertEquals(1.0, i.getAnomalyScore(), 0.0); 
-                            assertEquals(1.0, i.getClassification("dayOfWeek").getStats(1)[0], 0.0);
-                            assertEquals(1, i.getClassification("dayOfWeek").getStats(1).length);
-                            break;
-                    case 1: assertEquals(1.0, i.getAnomalyScore(), 0.0); 
-                            assertEquals(1.0, i.getClassification("dayOfWeek").getStats(1)[0], 0.0);
-                            assertEquals(1, i.getClassification("dayOfWeek").getStats(1).length);
-                            break;
-                    case 2: assertEquals(1.0, i.getAnomalyScore(), 0.0); 
-                            assertTrue(Arrays.equals(new double[] { 0.5, 0.5 }, i.getClassification("dayOfWeek").getStats(1)));
-                            assertEquals(2, i.getClassification("dayOfWeek").getStats(1).length);
-                            break;
-                    case 3: assertEquals(1.0, i.getAnomalyScore(), 0.0); 
-                            assertTrue(Arrays.equals(new double[] { 
-                                0.33333333333333333, 0.33333333333333333, 0.33333333333333333 }, i.getClassification("dayOfWeek").getStats(1)));
-                            assertEquals(3, i.getClassification("dayOfWeek").getStats(1).length);
-                            break;
-                    case 4: assertEquals(1.0, i.getAnomalyScore(), 0.0); 
-                            assertTrue(Arrays.equals(new double[] { 0.25, 0.25, 0.25, 0.25 }, i.getClassification("dayOfWeek").getStats(1)));
-                            assertEquals(4, i.getClassification("dayOfWeek").getStats(1).length);
-                            break;
-                    case 5: assertEquals(1.0, i.getAnomalyScore(), 0.0); 
-                            assertTrue(Arrays.equals(new double[] { 0.2, 0.2, 0.2, 0.2, 0.2 }, i.getClassification("dayOfWeek").getStats(1)));
-                            assertEquals(5, i.getClassification("dayOfWeek").getStats(1).length);
-                            break;
-                    case 6: assertEquals(1.0, i.getAnomalyScore(), 0.0); 
-                            assertTrue(Arrays.equals(new double[] { 
-                                0.16666666666666666, 0.16666666666666666,
-                                0.16666666666666666, 0.16666666666666666, 
-                                0.16666666666666666, 0.16666666666666666 }, i.getClassification("dayOfWeek").getStats(1)));
-                            assertEquals(6, i.getClassification("dayOfWeek").getStats(1).length);
-                            break;
-                }
-                idx++;
-            }
-        });
-       
+        n.lookup("r1").close();
+        
+        n.setLearn(false);
+        
+        assertFalse(n.isLearn());
+        
         Region r1 = n.lookup("r1");
-        r1.start();
-        
-        try {
-            r1.lookup("4").getLayerThread().join();
-        }catch(Exception e) {
-            e.printStackTrace();
+        assertFalse(n.isLearn());
+        Layer<?> layer = r1.getTail();
+        assertFalse(layer.isLearn());
+        while(layer.getNext() != null) {
+            layer = layer.getNext();
+            assertFalse(layer.isLearn());
         }
-        
-        
     }
     
     int idx0 = 0;

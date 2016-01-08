@@ -5,15 +5,15 @@
  * following terms and conditions apply:
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
+ * it under the terms of the GNU Affero Public License version 3 as
  * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
+ * See the GNU Affero Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero Public License
  * along with this program.  If not, see http://www.gnu.org/licenses.
  *
  * http://numenta.org/licenses/
@@ -37,6 +37,8 @@ public class Tuple {
     /** The internal container array */
 	protected Object[] container;
 	
+	private int hashcode;
+	
 	/**
 	 * Instantiates a new {@code Tuple}
 	 * @param objects
@@ -44,6 +46,7 @@ public class Tuple {
 	public Tuple(Object... objects) {
 		container = new Object[objects.length];
 		for(int i = 0;i < objects.length;i++) container[i] = objects[i];
+		this.hashcode = hashCode();
 	}
 	
 	/**
@@ -115,7 +118,7 @@ public class Tuple {
 		if (getClass() != obj.getClass())
 			return false;
 		Tuple other = (Tuple) obj;
-		if (!Arrays.equals(container, other.container))
+		if (this.hashcode != other.hashcode)
 			return false;
 		return true;
 	}

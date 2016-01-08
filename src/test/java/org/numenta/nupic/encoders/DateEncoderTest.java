@@ -236,8 +236,11 @@ public class DateEncoderTest {
                 "Monday"
         )).forced(true).build();
         DateEncoder e2 = DateEncoder.builder().weekend(21, 1).forced(true).build();
+        //DateTime d = new DateTime(1988,5,29,20,0);
         DateTime d = new DateTime(1988,5,29,20,0);
 
+        System.out.println("DateEncoderTest.testWeekend(): e.encode(d)  = " + Arrays.toString(e.encode(d)));
+        System.out.println("DateEncoderTest.testWeekend(): e2.encode(d) = " + Arrays.toString(e2.encode(d)));
         assertArrayEquals(e.encode(d), e2.encode(d));
 
         for (int i = 0; i < 300; i++) {
@@ -258,6 +261,7 @@ public class DateEncoderTest {
             assertEquals(1, range.size());
             assertEquals(1, ((List<MinMax>)range.get(0)).size());
             MinMax minmax = range.getRange(0);
+            System.out.println("DateEncoderTest.testWeekend(): minmax.min() = " + minmax.min());
 
             if(minmax.min() == 1.0) {
                 assertEquals(1, curDate.getDayOfWeek());

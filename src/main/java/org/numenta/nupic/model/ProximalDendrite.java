@@ -5,15 +5,15 @@
  * following terms and conditions apply:
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
+ * it under the terms of the GNU Affero Public License version 3 as
  * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
+ * See the GNU Affero Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero Public License
  * along with this program.  If not, see http://www.gnu.org/licenses.
  *
  * http://numenta.org/licenses/
@@ -27,7 +27,6 @@ import java.util.List;
 import org.numenta.nupic.Connections;
 
 public class ProximalDendrite extends Segment {
-    private int index;
     private Pool pool;
 
     /**
@@ -35,7 +34,7 @@ public class ProximalDendrite extends Segment {
      * @param index     this {@code ProximalDendrite}'s index.
      */
     public ProximalDendrite(int index) {
-        this.index = index;
+        super(index);
     }
 
     /**
@@ -57,14 +56,6 @@ public class ProximalDendrite extends Segment {
 
     public void clearSynapses(Connections c) {
         c.getSynapses(this).clear();
-    }
-
-    /**
-     * Returns this {@link ProximalDendrite}'s index.
-     * @return
-     */
-    public int getIndex() {
-        return index;
     }
 
     /**
@@ -112,7 +103,7 @@ public class ProximalDendrite extends Segment {
     }
 
     /**
-     * Sets the input vector synapse indexes which are connected (>= synPermConnected)
+     * Sets the input vector synapse indexes which are connected (&gt;= synPermConnected)
      * @param c
      * @param connectedIndexes
      */
@@ -127,7 +118,7 @@ public class ProximalDendrite extends Segment {
      * @return
      */
     public int[] getConnectedSynapsesDense(Connections c) {
-        return c.getPotentialPools().getObject(index).getDenseConnections(c);
+        return c.getPotentialPools().get(index).getDenseConnections(c);
     }
 
     /**
@@ -136,6 +127,6 @@ public class ProximalDendrite extends Segment {
      * @return
      */
     public int[] getConnectedSynapsesSparse(Connections c) {
-        return c.getPotentialPools().getObject(index).getSparseConnections();
+        return c.getPotentialPools().get(index).getSparseConnections();
     }
 }

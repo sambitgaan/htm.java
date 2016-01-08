@@ -5,15 +5,15 @@
  * following terms and conditions apply:
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
+ * it under the terms of the GNU Affero Public License version 3 as
  * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
+ * See the GNU Affero Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero Public License
  * along with this program.  If not, see http://www.gnu.org/licenses.
  *
  * http://numenta.org/licenses/
@@ -253,6 +253,7 @@ public class DateEncoder extends Encoder<DateTime> {
                     .build();
             addChildEncoder(timeOfDayEncoder);
         }
+
     }
 
     private boolean isValidEncoderPropertyTuple(Tuple encoderPropertyTuple) {
@@ -510,10 +511,11 @@ public class DateEncoder extends Encoder<DateTime> {
 
         //Get the scalar values for each sub-field
 
-        double timeOfDay = inputData.getHourOfDay() + inputData.getMinuteOfHour() / 60.0;
+        double timeOfDay = inputData.getHourOfDay() + inputData.getMinuteOfHour() / 60.0
+                + inputData.getSecondOfMinute() / 3600.0;
 
         // The day of week was 1 based, so convert to 0 based
-        int dayOfWeek = inputData.getDayOfWeek() - 1; // + timeOfDay / 24.0
+        double dayOfWeek = (double)inputData.getDayOfWeek() - 1.0 + (timeOfDay / 24.0);
 
         if(seasonEncoder != null) {
             // The day of year was 1 based, so convert to 0 based
@@ -528,8 +530,7 @@ public class DateEncoder extends Encoder<DateTime> {
         if(weekendEncoder != null) {
 
             //saturday, sunday or friday evening
-            boolean isWeekend = dayOfWeek == 6 || dayOfWeek == 5 ||
-                    (dayOfWeek == 4 && timeOfDay > 18);
+            boolean isWeekend = (dayOfWeek >= 4.75);
 
             int weekend = isWeekend ? 1 : 0;
 
@@ -537,7 +538,8 @@ public class DateEncoder extends Encoder<DateTime> {
         }
 
         if(customDaysEncoder != null) {
-            boolean isCustomDays = customDaysList.contains(dayOfWeek);
+            int ordinalDay = (int)dayOfWeek;
+            boolean isCustomDays = customDaysList.contains(ordinalDay);
 
             int customDay = isCustomDays ? 1 : 0;
 

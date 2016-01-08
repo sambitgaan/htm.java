@@ -5,15 +5,15 @@
  * following terms and conditions apply:
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
+ * it under the terms of the GNU Affero Public License version 3 as
  * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
+ * See the GNU Affero Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero Public License
  * along with this program.  If not, see http://www.gnu.org/licenses.
  *
  * http://numenta.org/licenses/
@@ -27,7 +27,6 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -96,11 +95,10 @@ public class MultiEncoder extends Encoder<Object> {
             int[] tempArray = new int[encoder.getWidth()];
 
             try {
-                encoder.encodeIntoArray(getInputValue(input, name), tempArray);
+                Object o = getInputValue(input, name);
+                encoder.encodeIntoArray(o, tempArray);
             }catch(Exception e) {
-                System.out.println("input = " + input + ", name = " + name + ",  inputValue = " + getInputValue(input, name));
-                e.printStackTrace();
-                System.exit(1);
+                throw new IllegalStateException(e);
             }
 
             System.arraycopy(tempArray, 0, output, offset, tempArray.length);
@@ -145,37 +143,13 @@ public class MultiEncoder extends Encoder<Object> {
         width += child.getWidth();
     }
 
-    @SuppressWarnings("rawtypes")
+    /**
+     * Configures this {@code MultiEncoder} using the specified settings map.
+     * 
+     * @param fieldEncodings
+     */
     public void addMultipleEncoders(Map<String, Map<String, Object>> fieldEncodings) {
-        // Sort the encoders so that they end up in a controlled order
-        List<String> sortedFields = new ArrayList<String>(fieldEncodings.keySet());
-        Collections.sort(sortedFields);
-
-        for (String field : sortedFields) {
-            Map<String, Object> params = fieldEncodings.get(field);
-
-            if (!params.containsKey("fieldName")) {
-                throw new IllegalArgumentException("Missing fieldname for encoder " + field);
-            }
-            String fieldName = (String) params.get("fieldName");
-
-            if (!params.containsKey("encoderType")) {
-                throw new IllegalArgumentException("Missing type for encoder " + field);
-            }
-
-            String encoderType = (String) params.get("encoderType");
-            Encoder.Builder builder = getBuilder(encoderType);
-            for (String param : params.keySet()) {
-                if (!param.equals("fieldName") && !param.equals("encoderType") &&
-                    !param.equals("fieldType") && !param.equals("fieldEncodings")) {
-
-                    setValue(builder, param, params.get(param));
-                }
-            }
-
-            Encoder encoder = (Encoder)builder.build();
-            this.addEncoder(fieldName, encoder);
-        }
+        MultiEncoderAssembler.assemble(this, fieldEncodings);
     }
 
     /**
@@ -198,6 +172,8 @@ public class MultiEncoder extends Encoder<Object> {
                 return PassThroughEncoder.builder();
             case "ScalarEncoder":
                 return ScalarEncoder.builder();
+            case "AdaptiveScalarEncoder":
+                return AdaptiveScalarEncoder.builder();
             case "SparsePassThroughEncoder":
                 return SparsePassThroughEncoder.sparseBuilder();
             case "SDRCategoryEncoder":
@@ -208,6 +184,8 @@ public class MultiEncoder extends Encoder<Object> {
                 return DateEncoder.builder();
             case "DeltaEncoder":
                 return DeltaEncoder.deltaBuilder();
+            case "SDRPassThroughEncoder" :
+                return SDRPassThroughEncoder.sptBuilder();
             default:
                 throw new IllegalArgumentException("Invalid encoder: " + encoderName);
         }

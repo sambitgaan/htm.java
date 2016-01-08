@@ -5,15 +5,15 @@
  * following terms and conditions apply:
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
+ * it under the terms of the GNU Affero Public License version 3 as
  * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
+ * See the GNU Affero Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero Public License
  * along with this program.  If not, see http://www.gnu.org/licenses.
  *
  * http://numenta.org/licenses/
@@ -142,7 +142,7 @@ public class CLAClassifier {
 		this.actValueAlpha = actValueAlpha;
 		this.verbosity = verbosity;
 		actualValues.add(null);
-		patternNZHistory = new Deque<Tuple>(steps.size() + 1);
+		patternNZHistory = new Deque<Tuple>(ArrayUtils.max(steps.toArray()) + 1);
 	}
 	
 	/**
@@ -251,8 +251,7 @@ public class CLAClassifier {
 			        // buckets equally likely. There is no actual prediction for this
 			        // timestep so any of the possible predictions are just as good.
 					if(sumVotes.length > 0) {
-						Arrays.fill(sumVotes, 1);
-						sumVotes = ArrayUtils.divide(sumVotes, sumVotes.length);
+						Arrays.fill(sumVotes, 1.0 / (double)sumVotes.length);
 					}
 				}
 				

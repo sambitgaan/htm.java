@@ -4,7 +4,7 @@ apply plugin: 'eclipse'
 apply plugin: 'signing'
 
 group = 'org.numenta'
-version = '0.5.1-SNAPSHOT'
+version = '0.6.5'
 archivesBaseName = 'htm.java'
 
 sourceCompatibility = 1.8
@@ -12,7 +12,7 @@ targetCompatibility = 1.8
 
 jar {
     manifest {
-        attributes 'Implementation-Title': 'htm.java', 'Implementation-Version': '0.5.1-SNAPSHOT'
+        attributes 'Implementation-Title': 'htm.java', 'Implementation-Version': '0.6.5'
     }
 }
 
@@ -42,6 +42,10 @@ dependencies {
     compile group: 'org.slf4j', name: 'slf4j-simple', version:'1.7.10'
 =======
 	compile group: 'io.reactivex', name: 'rxjava', version: '1.0.10'
+<<<<<<< HEAD
+>>>>>>> upstream/master
+=======
+	compile group: 'io.cortical', name: 'retina-service-java-api-client', version: '2.2.1'
 >>>>>>> upstream/master
     testCompile group: 'junit', name: 'junit', version:'4.11'
     testCompile group: 'ch.qos.logback', name: 'logback-classic', version:'1.1.2'
@@ -150,7 +154,7 @@ uploadArchives {
 
         licenses {
           license {
-            name 'The GNU General Public License.'
+            name 'The GNU Affero Public License.'
             url 'https://github.com/numenta/htm.java/blob/master/LICENSE.txt'
           }
         }

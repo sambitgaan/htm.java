@@ -5,15 +5,15 @@
  * following terms and conditions apply:
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
+ * it under the terms of the GNU Affero Public License version 3 as
  * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
+ * See the GNU Affero Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero Public License
  * along with this program.  If not, see http://www.gnu.org/licenses.
  *
  * http://numenta.org/licenses/
@@ -27,14 +27,30 @@ import java.util.List;
 import org.numenta.nupic.Connections;
 
 /**
- * Base class which handles the creation of {@link Synapses} on behalf of
+ * Base class which handles the creation of {@link Synapse}s on behalf of
  * inheriting class types.
  * 
  * @author David Ray
  * @see DistalDendrite
  * @see ProximalDendrite
  */
-public abstract class Segment {
+public abstract class Segment implements Comparable<Segment> {
+    protected int index;
+    protected Integer boxedIndex;
+    
+    public Segment(int index) {
+        this.index = index;
+        this.boxedIndex = new Integer(index);
+    }
+    
+    /**
+     * Returns this {@link ProximalDendrite}'s index.
+     * @return
+     */
+    public int getIndex() {
+        return index;
+    }
+
     /**
      * Creates and returns a newly created {@link Synapse} with the specified
      * source cell, permanence, and index.
@@ -61,4 +77,44 @@ public abstract class Segment {
         syns.add(s);
         return s;
     }
+    
+    /**
+     * {@inheritDoc}
+     * 
+     * <em> Note: All comparisons use the segment's index only </em>
+     */
+    @Override
+    public int compareTo(Segment arg0) {
+        return boxedIndex.compareTo(arg0.boxedIndex);
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + index;
+        return result;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if(this == obj)
+            return true;
+        if(obj == null)
+            return false;
+        if(getClass() != obj.getClass())
+            return false;
+        Segment other = (Segment)obj;
+        if(index != other.index)
+            return false;
+        return true;
+    }
+    
+    
 }

@@ -5,15 +5,15 @@
  * following terms and conditions apply:
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
+ * it under the terms of the GNU Affero Public License version 3 as
  * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
+ * See the GNU Affero Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero Public License
  * along with this program.  If not, see http://www.gnu.org/licenses.
  *
  * http://numenta.org/licenses/
@@ -37,9 +37,9 @@ import java.util.Arrays;
  *
  * @param <T>
  */
-public class SparseObjectMatrix<T> extends SparseMatrix<T> {
+public class SparseObjectMatrix<T> extends AbstractSparseMatrix<T> {
     private TIntObjectMap<T> sparseMap = new TIntObjectHashMap<T>();
-    
+
     /**
      * Constructs a new {@code SparseObjectMatrix}
      * @param dimensions	the dimensions of this array
@@ -47,7 +47,7 @@ public class SparseObjectMatrix<T> extends SparseMatrix<T> {
     public SparseObjectMatrix(int[] dimensions) {
         super(dimensions, false);
     }
-    
+
     /**
      * Constructs a new {@code SparseObjectMatrix}
      * @param dimensions					the dimensions of this array
@@ -56,43 +56,31 @@ public class SparseObjectMatrix<T> extends SparseMatrix<T> {
     public SparseObjectMatrix(int[] dimensions, boolean useColumnMajorOrdering) {
         super(dimensions, useColumnMajorOrdering);
     }
-    
+
     /**
      * Sets the object to occupy the specified index.
      * 
      * @param index     the index the object will occupy
      * @param object    the object to be indexed.
      */
-    @SuppressWarnings("unchecked")
     @Override
-    public <S extends SparseMatrix<T>> S set(int index, T object) {
+    public SparseObjectMatrix<T> set(int index, T object) {
         sparseMap.put(index, (T)object);
-        return (S)this;
+        return this;
     }
-    
+
     /**
      * Sets the specified object to be indexed at the index
      * computed from the specified coordinates.
      * @param object        the object to be indexed.
      * @param coordinates   the row major coordinates [outer --> ,...,..., inner]
      */
-    @SuppressWarnings("unchecked")
     @Override
-    public <S extends SparseMatrix<T>> S set(int[] coordinates, T object) {
+    public SparseObjectMatrix<T> set(int[] coordinates, T object) {
         set(computeIndex(coordinates), object);
-        return (S)this;
+        return this;
     }
-    
-    /**
-     * Returns an outer array of T values.
-     * @return
-     */
-    @SuppressWarnings("unchecked")
-	@Override
-    protected T[] values() {
-    	return (T[])sparseMap.values();
-    }
-    
+
     /**
      * Returns the T at the specified index.
      * 
@@ -101,9 +89,9 @@ public class SparseObjectMatrix<T> extends SparseMatrix<T> {
      */
     @Override
     public T getObject(int index) {
-        return sparseMap.get(index);
+        return get(index);
     }
-    
+
     /**
      * Returns the T at the index computed from the specified coordinates
      * @param coordinates   the coordinates from which to retrieve the indexed object
@@ -111,9 +99,20 @@ public class SparseObjectMatrix<T> extends SparseMatrix<T> {
      */
     @Override
     public T get(int... coordinates) {
-        return sparseMap.get(computeIndex(coordinates));
+        return get(computeIndex(coordinates));
     }
-    
+
+    /**
+     * Returns the T at the specified index.
+     * 
+     * @param index     the index of the T to return
+     * @return  the T at the specified index.
+     */
+    @Override
+    public T get(int index) {
+        return this.sparseMap.get(index);
+    }
+
     /**
      * Returns a sorted array of occupied indexes.
      * @return  a sorted array of occupied indexes.
@@ -122,12 +121,13 @@ public class SparseObjectMatrix<T> extends SparseMatrix<T> {
     public int[] getSparseIndices() {
         return reverse(sparseMap.keys());
     }
-    
+
     /**
      * {@inheritDoc}
      */
     @Override
     public String toString() {
-    	return Arrays.toString(dimensions);
+        return Arrays.toString(getDimensions());
     }
+
 }

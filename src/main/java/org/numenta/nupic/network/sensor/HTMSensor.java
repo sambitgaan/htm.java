@@ -5,15 +5,15 @@
  * following terms and conditions apply:
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
+ * it under the terms of the GNU Affero Public License version 3 as
  * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
+ * See the GNU Affero Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero Public License
  * along with this program.  If not, see http://www.gnu.org/licenses.
  *
  * http://numenta.org/licenses/
@@ -26,7 +26,6 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -40,7 +39,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import org.joda.time.format.DateTimeFormatter;
 import org.numenta.nupic.FieldMetaType;
 import org.numenta.nupic.Parameters;
 import org.numenta.nupic.Parameters.KEY;
@@ -51,15 +49,15 @@ import org.numenta.nupic.encoders.CoordinateEncoder;
 import org.numenta.nupic.encoders.DateEncoder;
 import org.numenta.nupic.encoders.DeltaEncoder;
 import org.numenta.nupic.encoders.Encoder;
-import org.numenta.nupic.encoders.Encoder.Builder;
 import org.numenta.nupic.encoders.EncoderTuple;
 import org.numenta.nupic.encoders.GeospatialCoordinateEncoder;
 import org.numenta.nupic.encoders.LogEncoder;
 import org.numenta.nupic.encoders.MultiEncoder;
+import org.numenta.nupic.encoders.MultiEncoderAssembler;
 import org.numenta.nupic.encoders.RandomDistributedScalarEncoder;
 import org.numenta.nupic.encoders.SDRCategoryEncoder;
+import org.numenta.nupic.encoders.SDRPassThroughEncoder;
 import org.numenta.nupic.encoders.ScalarEncoder;
-import org.numenta.nupic.util.Tuple;
 
 
 /**
@@ -146,49 +144,55 @@ public class HTMSensor<T> implements Sensor<T> {
      * which services the encoding of the field occurring in that position. This
      * sequence of types is contained by an instance of {@link Header} which
      * makes available an array of {@link FieldMetaType}s.
-     *    
      */
     private void makeIndexEncoderMap() {
         indexToEncoderMap = new TIntObjectHashMap<Encoder<?>>();
         
-        final FieldMetaType[] fieldTypes = header.getFieldTypes().toArray(new FieldMetaType[header.getFieldTypes().size()]);
-        
-        for(int i = 0;i < fieldTypes.length;i++) {
-            switch(fieldTypes[i]) {
+        for (int i = 0, size = header.getFieldNames().size(); i < size; i++) {
+            switch (header.getFieldTypes().get(i)) {
                 case DATETIME:
                     Optional<DateEncoder> de = getDateEncoder(encoder);
-                    if(de.isPresent()) {
+                    if (de.isPresent()) {
                         indexToEncoderMap.put(i, de.get());
-                    }else{
-                        throw new IllegalArgumentException("DateEncoder never initialized.");
+                    } else {
+                        throw new IllegalArgumentException("DateEncoder never initialized: " + header.getFieldNames().get(i));
                     }
                     break;
                 case BOOLEAN:
                 case FLOAT:
                 case INTEGER:
-                    Optional<Encoder<?>> opt = getNumberEncoder(encoder);
-                    if(opt.isPresent()) {
-                        indexToEncoderMap.put(i, opt.get());
-                    }else{
-                        throw new IllegalArgumentException("Number (Boolean also) encoder never initialized.");
+                    Optional<Encoder<?>> ne = getNumberEncoder(encoder);
+                    if (ne.isPresent()) {
+                        indexToEncoderMap.put(i, ne.get());
+                    } else {
+                        throw new IllegalArgumentException("Number (or Boolean) encoder never initialized: " + header.getFieldNames().get(i));
                     }
                     break;
                 case LIST:
                 case STRING:
-                    opt = getCategoryEncoder(encoder);
-                    if(opt.isPresent()) {
-                        indexToEncoderMap.put(i, opt.get());
-                    }else{
-                        throw new IllegalArgumentException("Category encoder never initialized.");
+                    Optional<Encoder<?>> ce = getCategoryEncoder(encoder);
+                    if (ce.isPresent()) {
+                        indexToEncoderMap.put(i, ce.get());
+                    } else {
+                        throw new IllegalArgumentException("Category encoder never initialized: " + header.getFieldNames().get(i));
                     }
                     break;
                 case COORD:
                 case GEO:
-                    opt = getCoordinateEncoder(encoder);
-                    if(opt.isPresent()) {
-                        indexToEncoderMap.put(i, opt.get());
-                    }else{
-                        throw new IllegalArgumentException("Coordinate encoder never initialized.");
+                    Optional<Encoder<?>> ge = getCoordinateEncoder(encoder);
+                    if (ge.isPresent()) {
+                        indexToEncoderMap.put(i, ge.get());
+                    } else {
+                        throw new IllegalArgumentException("Coordinate encoder never initialized: " + header.getFieldNames().get(i));
+                    }
+                    break;
+                case SARR:
+                case DARR:
+                    Optional<SDRPassThroughEncoder> spte = getSDRPassThroughEncoder(encoder);
+                    if (spte.isPresent()) {
+                        indexToEncoderMap.put(i, spte.get());
+                    } else {
+                        throw new IllegalArgumentException("SDRPassThroughEncoder encoder never initialized: " + header.getFieldNames().get(i));
                     }
                     break;
                 default:
@@ -300,11 +304,15 @@ public class HTMSensor<T> implements Sensor<T> {
                     }
                 }
               
+                // NOTE: The "inputMap" here is a special local implementation
+                //       of the "Map" interface, overridden so that we can access
+                //       the keys directly (without hashing). This map is only used
+                //       for this use case so it is ok to use this optimization as
+                //       a convenience.
                 if(inputMap == null) {
                     inputMap = new InputMap();
                     inputMap.fTypes = fieldTypes;
                 }
-                
                 
                 final boolean isParallel = delegate.getInputStream().isParallel();
                 
@@ -432,7 +440,7 @@ public class HTMSensor<T> implements Sensor<T> {
             }
         }
         
-        return null;
+        return Optional.empty();
     }
     
     /**
@@ -451,7 +459,7 @@ public class HTMSensor<T> implements Sensor<T> {
             }
         }
         
-        return null;
+        return Optional.empty();
     }
     
     /**
@@ -468,7 +476,24 @@ public class HTMSensor<T> implements Sensor<T> {
            }
        }
        
-       return Optional.of(null);
+       return Optional.empty();
+    }
+    
+    /**
+     * Searches through the specified {@link MultiEncoder}'s previously configured 
+     * encoders to find and return one that is of type {@link DateEncoder}
+     * 
+     * @param enc   the containing {@code MultiEncoder}
+     * @return
+     */
+    private Optional<SDRPassThroughEncoder> getSDRPassThroughEncoder(MultiEncoder enc) {
+       for(EncoderTuple t : enc.getEncoders(enc)) {
+           if(t.getEncoder() instanceof SDRPassThroughEncoder) {
+               return Optional.of((SDRPassThroughEncoder)t.getEncoder());
+           }
+       }
+       
+       return Optional.empty();
     }
     
     /**
@@ -492,7 +517,7 @@ public class HTMSensor<T> implements Sensor<T> {
             }
         }
         
-        return Optional.of(null);
+        return Optional.empty();
      }
     
     /**
@@ -567,164 +592,11 @@ public class HTMSensor<T> implements Sensor<T> {
                 throw new IllegalArgumentException(
                     "Cannot initialize this Sensor's MultiEncoder with a null settings");
             }
-            
-            // Sort the encoders so that they end up in a controlled order
-            List<String> sortedFields = new ArrayList<String>(encoderSettings.keySet());
-            Collections.sort(sortedFields);
-
-            for (String field : sortedFields) {
-                Map<String, Object> params = encoderSettings.get(field);
-
-                if (!params.containsKey("fieldName")) {
-                    throw new IllegalArgumentException("Missing fieldname for encoder " + field);
-                }
-                String fieldName = (String) params.get("fieldName");
-
-                if (!params.containsKey("encoderType")) {
-                    throw new IllegalArgumentException("Missing type for encoder " + field);
-                }
-                
-                String encoderType = (String) params.get("encoderType");
-                Builder<?, ?> builder = ((MultiEncoder)encoder).getBuilder(encoderType);
-                
-                if(encoderType.equals("SDRCategoryEncoder")) {
-                    ((MultiEncoder)encoder).setValue(builder, "n", params.get("n"));
-                    ((MultiEncoder)encoder).setValue(builder, "w", params.get("w"));
-                    ((MultiEncoder)encoder).setValue(builder, "forced", params.get("forced"));
-                    ((MultiEncoder)encoder).setValue(builder, "categoryList", params.get("categoryList"));
-                }else if(encoderType.equals("DateEncoder")) {
-                    // Extract date specific mappings out of the map so that we can
-                    // pre-configure the DateEncoder with its needed directives.
-                    configureDateBuilder(encoderSettings, (DateEncoder.Builder)builder);
-                }else{
-                    for (String param : params.keySet()) {
-                        if (!param.equals("fieldName") && !param.equals("encoderType") &&
-                            !param.equals("fieldType") && !param.equals("fieldEncodings")) {
-                            
-                            ((MultiEncoder)encoder).setValue(builder, param, params.get(param));
-                        }
-                    }
-                }
-
-                ((MultiEncoder)encoder).addEncoder(fieldName, (Encoder<?>)builder.build());
-            }
-        }
-    }
-    
-    /**
-     * Do special configuration for DateEncoder
-     * @param encoderSettings
-     */
-    private void configureDateBuilder(Map<String, Map<String, Object>> encoderSettings, DateEncoder.Builder b) {
-        Map<String, Object> dateEncoderSettings = getDateEncoderMap(encoderSettings);
-        if(dateEncoderSettings == null) {
-            throw new IllegalStateException("Input requires missing DateEncoder settings mapping.");
         }
         
-        for(String key : dateEncoderSettings.keySet()) {
-            if(!key.equals("fieldName") && !key.equals("encoderType") &&
-                !key.equals("fieldType") && !key.equals("fieldEncodings")) {
-                
-                if(!key.equals("season") && !key.equals("dayOfWeek") &&
-                    !key.equals("weekend") && !key.equals("holiday") &&
-                    !key.equals("timeOfDay") && !key.equals("customDays") && 
-                    !key.equals("formatPattern") && !key.equals("dateFormatter")) {
-                
-                    ((MultiEncoder)encoder).setValue(b, key, dateEncoderSettings.get(key));
-                }else{
-                    if(key.equals("formatPattern")) {
-                        b.formatPattern((String)dateEncoderSettings.get(key));
-                    }else if(key.equals("dateFormatter")) {
-                        b.formatter((DateTimeFormatter)dateEncoderSettings.get(key));
-                    }else{
-                        setDateFieldBits(b, dateEncoderSettings, key);
-                    }
-                }
-            }
-        }
+        MultiEncoderAssembler.assemble(encoder, encoderSettings);
     }
-    
-    /**
-     * Extract the date encoder settings out of the main map so that we can do
-     * special initialization on any {@link DateEncoder} which may exist.
-     * @param encoderSettings
-     * @return the {@link DateEncoder} settings map
-     */
-    private Map<String, Object> getDateEncoderMap(Map<String, Map<String, Object>> encoderSettings) {
-        for(String key : encoderSettings.keySet()) {
-            String keyType = null;
-            if((keyType = (String)encoderSettings.get(key).get("encoderType")) != null && 
-                keyType.equals("DateEncoder")) {
-                // Remove the key from the specified map (extraction)
-                return (Map<String, Object>)encoderSettings.get(key);
-            }
-        }
-        return null;
-    }
-    
-    /**
-     * Initializes the {@link DateEncoder.Builder} specified
-     * @param b         the builder on which to set the mapping.
-     * @param m         the map containing the values
-     * @param key       the key to be set.
-     */
-    @SuppressWarnings("unchecked")
-    private void setDateFieldBits(DateEncoder.Builder b, Map<String, Object> m, String key) {
-        Tuple t = (Tuple)m.get(key);
-        switch(key) {
-            case "season" : {
-                if(t.size() > 1 && ((double)t.get(1)) > 0.0) {
-                    b.season((int)t.get(0), (double)t.get(1));
-                }else{
-                    b.season((int)t.get(0));
-                }
-                break;
-            }
-            case "dayOfWeek" : {
-                if(t.size() > 1 && ((double)t.get(1)) > 0.0) {
-                    b.dayOfWeek((int)t.get(0), (double)t.get(1));
-                }else{
-                    b.dayOfWeek((int)t.get(0));
-                }
-                break;
-            }
-            case "weekend" : {
-                if(t.size() > 1 && ((double)t.get(1)) > 0.0) {
-                    b.weekend((int)t.get(0), (double)t.get(1));
-                }else{
-                    b.weekend((int)t.get(0));
-                }
-                break;
-            }
-            case "holiday" : {
-                if(t.size() > 1 && ((double)t.get(1)) > 0.0) {
-                    b.holiday((int)t.get(0), (double)t.get(1));
-                }else{
-                    b.holiday((int)t.get(0));
-                }
-                break;
-            }
-            case "timeOfDay" : {
-                if(t.size() > 1 && ((double)t.get(1)) > 0.0) {
-                    b.timeOfDay((int)t.get(0), (double)t.get(1));
-                }else{
-                    b.timeOfDay((int)t.get(0));
-                }
-                break;
-            }
-            case "customDays" : {
-                if(t.size() > 1 && ((double)t.get(1)) > 0.0) {
-                    b.customDays((int)t.get(0), (List<String>)t.get(1));
-                }else{
-                    b.customDays((int)t.get(0));
-                }
-                break;
-            }
-            
-            default: break;
-        }
-    }
-    
+      
     /**
      * Returns this {@code HTMSensor}'s {@link MultiEncoder}
      * @return
@@ -732,13 +604,6 @@ public class HTMSensor<T> implements Sensor<T> {
     public <K> MultiEncoder getEncoder() {
         return (MultiEncoder)encoder;
     }
-    
-    public static void main(String[] args) {
-        ArrayList<String> ll = new ArrayList<>(5);
-        ll.set(padTo(0, ll), "My");
-        ll.set(padTo(2, ll), "array");
-        ll.set(padTo(1, ll), "ordered");
-        
-        System.out.println(ll + ", size = " + ll.size());
-    }
+
 }
+

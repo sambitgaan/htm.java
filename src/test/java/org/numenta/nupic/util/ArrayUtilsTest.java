@@ -5,15 +5,15 @@
  * following terms and conditions apply:
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
+ * it under the terms of the GNU Affero Public License version 3 as
  * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
+ * See the GNU Affero Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero Public License
  * along with this program.  If not, see http://www.gnu.org/licenses.
  *
  * http://numenta.org/licenses/
@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -295,18 +296,37 @@ public class ArrayUtilsTest {
           Object multiDimArray = createMultiDimensionArray(dimensions);
           ArrayUtils.fillArray(multiDimArray, 1);
           assertEquals(125, ArrayUtils.aggregateArray(multiDimArray));
-          System.out.println(ArrayUtils.intArrayToString(multiDimArray));
-   	}
+    }
 
     private Object createMultiDimensionArray(int[] sizes){
-            System.out.println("Creating array with dimensions / sizes: " +
-                    Arrays.toString(sizes).replaceAll(", ", "]["));
-            return Array.newInstance(int.class, sizes);
-        }
+        return Array.newInstance(int.class, sizes);
+    }
 
 	@Test
 	public void testConcatAll() {
 		assertTrue(Arrays.equals(new int[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 0},
-				ArrayUtils.concatAll(new int[]{1, 2}, new int[]{3, 4, 5, 6, 7}, new int[]{8, 9, 0})));
+			ArrayUtils.concatAll(new int[]{1, 2}, new int[]{3, 4, 5, 6, 7}, new int[]{8, 9, 0})));
+	}
+	
+	@Test
+	public void testReplace() {
+	    assertTrue(Arrays.equals(new int[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 0},
+	        ArrayUtils.replace(5, 10, new int[]{1, 2, 3, 4, 5, -1, -1, -1, -1, -1}, new int[] { 6, 7, 8, 9, 0})));
+	        
+	}
+	
+	@Test
+	public void testIsSparse() {
+	    int[] t = new int[] { 0, 1, 0 };
+	    int[] t1 = new int[] { 4, 5, 6, 7 };
+	    
+	    assertFalse(ArrayUtils.isSparse(t));
+	    assertTrue(ArrayUtils.isSparse(t1));
+	}
+
+	@Test
+	public void testNGreatest() {
+	    double[] overlaps = new double[] { 1, 2, 1, 4, 8, 3, 12, 5, 4, 1 };
+	    assertTrue(Arrays.equals(new int[] { 6, 4, 7 }, ArrayUtils.nGreatest(overlaps, 3)));
 	}
 }

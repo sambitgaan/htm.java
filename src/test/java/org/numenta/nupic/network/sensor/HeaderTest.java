@@ -5,15 +5,15 @@
  * following terms and conditions apply:
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 3 as
+ * it under the terms of the GNU Affero Public License version 3 as
  * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
+ * See the GNU Affero Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero Public License
  * along with this program.  If not, see http://www.gnu.org/licenses.
  *
  * http://numenta.org/licenses/
@@ -145,7 +145,7 @@ public class HeaderTest {
             assertTrue(header.isLearn());
         }
         
-        header = new Header(getTestHeaderReset());
+        header = new Header(getTestHeaderLearn());
         lines = getLines(ResourceLocator.path("rec-center-hourly-4learn.csv"));
        
         int idx = 0;
@@ -154,12 +154,16 @@ public class HeaderTest {
             System.arraycopy(line, 0, shifted, 1, line.length);
             shifted[0] = String.valueOf(idx);
             
+            if(idx == 72) {
+                idx = 72;
+            }
+            
             header.process(shifted);
             
             if(line[2].equals("1")) {
-                assertTrue(header.isReset());
+                assertTrue(header.isLearn());
             }else{
-                assertFalse(header.isReset());
+                assertFalse(header.isLearn());
             }
             idx++;
         }
@@ -234,6 +238,26 @@ public class HeaderTest {
                 new Tuple("timestamp", "consumption"),
                 new Tuple("datetime", "float"),
                 new Tuple("T", "B", "R"),
+            };
+
+            @Override
+            public Tuple getRow(int row) {
+                return ta[row];
+            }
+
+            @Override
+            public int size() {
+                return ta.length;
+            }
+        };
+    }
+    
+    private ValueList getTestHeaderLearn() {
+        return new ValueList() {
+            Tuple[] ta = new Tuple[] {
+                new Tuple("timestamp", "consumption"),
+                new Tuple("datetime", "float"),
+                new Tuple("T", "B", "L"),
             };
 
             @Override
