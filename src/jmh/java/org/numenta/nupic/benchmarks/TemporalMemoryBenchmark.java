@@ -24,7 +24,7 @@ package org.numenta.nupic.benchmarks;
 
 import java.util.concurrent.TimeUnit;
 
-import org.numenta.nupic.ComputeCycle;
+import org.numenta.nupic.model.ComputeCycle;
 import org.numenta.nupic.util.ArrayUtils;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -52,7 +52,7 @@ public class TemporalMemoryBenchmark extends AbstractAlgorithmBenchmark {
         SDRs = new int[7][];
 
         for(int i = 0;i < 7;i++) {
-            pooler.compute(memory, input[i], SDR, true, false);
+            pooler.compute(memory, input[i], SDR, true);
             SDRs[i] = ArrayUtils.where(SDR, ArrayUtils.WHERE_1);
         }
 

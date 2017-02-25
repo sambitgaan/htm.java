@@ -28,6 +28,7 @@ import java.util.List;
 
 import org.numenta.nupic.algorithms.Anomaly.AveragedAnomalyRecordList;
 import org.numenta.nupic.algorithms.AnomalyLikelihood.AnomalyParams;
+import org.numenta.nupic.model.Persistable;
 
 /**
  * Container class to hold the results of {@link AnomalyLikelihood} estimations
@@ -37,7 +38,9 @@ import org.numenta.nupic.algorithms.AnomalyLikelihood.AnomalyParams;
  * @see AnomalyLikelihood
  * @see AnomalyLikelihoodTest
  */
-public class AnomalyLikelihoodMetrics {
+public class AnomalyLikelihoodMetrics implements Persistable {
+    private static final long serialVersionUID = 1L;
+    
     private AnomalyParams params;
     private AveragedAnomalyRecordList aggRecordList;
     private double[] likelihoods;

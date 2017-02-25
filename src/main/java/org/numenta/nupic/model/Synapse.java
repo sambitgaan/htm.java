@@ -22,8 +22,6 @@
 
 package org.numenta.nupic.model;
 
-import org.numenta.nupic.Connections;
-
 /**
  * Represents a connection with varying strength which when above 
  * a configured threshold represents a valid connection. 
@@ -44,19 +42,40 @@ import org.numenta.nupic.Connections;
  * @see DistalDendrite
  * @see Connections
  */
-public class Synapse {
+public class Synapse implements Persistable, Comparable<Synapse> {
+    /** keep it simple */
+    private static final long serialVersionUID = 1L;
+    
     private Cell sourceCell;
     private Segment segment;
     private Pool pool;
     private int synapseIndex;
+    private Integer boxedIndex;
     private int inputIndex;
     private double permanence;
-
+    private boolean destroyed;
     
     /**
      * Constructor used when setting parameters later.
      */
     public Synapse() {}
+    
+    /**
+     * Constructs a new {@code Synapse} for a {@link DistalDendrite}
+     * @param sourceCell    the {@link Cell} which will activate this {@code Synapse};
+     * @param segment       the owning dendritic segment
+     * @param pool          this {@link Pool} of which this synapse is a member
+     * @param index         this {@code Synapse}'s index
+     * @param permanence    
+     */
+    public Synapse(Cell presynapticCell, Segment segment, int index, double permanence) {
+        this.sourceCell = presynapticCell;
+        this.segment = segment;
+        this.synapseIndex = index;
+        this.boxedIndex = new Integer(index);
+        this.inputIndex = presynapticCell.getIndex();
+        this.permanence = permanence;
+    }
 
     /**
      * Constructs a new {@code Synapse}
@@ -74,12 +93,8 @@ public class Synapse {
         this.segment = segment;
         this.pool = pool;
         this.synapseIndex = index;
+        this.boxedIndex = new Integer(index);
         this.inputIndex = inputIndex;
-        
-        // If this isn't a synapse on a proximal dendrite
-        if(sourceCell != null) {
-            sourceCell.addReceptorSynapse(c, this);
-        }
     }
 
     /**
@@ -113,6 +128,8 @@ public class Synapse {
      */
     public void setPermanence(Connections c, double perm) {
         this.permanence = perm;
+        
+        // On proximal dendrite which has no presynaptic cell
         if(sourceCell == null) {
             pool.updatePool(c, this, perm);
         }
@@ -125,6 +142,15 @@ public class Synapse {
     public Segment getSegment() {
         return segment;
     }
+    
+    /**
+     * Called by {@link Connections#destroySynapse(Synapse)} to assign
+     * a reused Synapse to another presynaptic Cell
+     * @param cell  the new presynaptic cell
+     */
+    public void setPresynapticCell(Cell cell) {
+        this.sourceCell = cell;
+    }
 
     /**
      * Returns the containing {@link Cell} 
@@ -135,19 +161,19 @@ public class Synapse {
     }
     
     /**
-     * Removes the references to this Synapse in its associated
-     * {@link Pool} and its upstream presynapticCell's reference.
-     * 
-     * @param c
+     * Returns the flag indicating whether this segment has been destroyed.
+     * @return  the flag indicating whether this segment has been destroyed.
      */
-    public void destroy(Connections c) {
-        this.pool.destroySynapse(this);
-        if(sourceCell != null) {
-            c.getSynapses((DistalDendrite)segment).remove(this);
-            sourceCell.removeReceptorSynapse(c, this);
-        }else{
-            c.getSynapses((ProximalDendrite)segment).remove(this);
-        }
+    public boolean destroyed() {
+        return destroyed;
+    }
+    
+    /**
+     * Sets the flag indicating whether this segment has been destroyed.
+     * @param b the flag indicating whether this segment has been destroyed.
+     */
+    public void setDestroyed(boolean b) {
+        this.destroyed = b;
     }
 
     /**
@@ -161,5 +187,58 @@ public class Synapse {
         }
         sb.append(" ]");
         return sb.toString();
+    }
+    
+    /**
+     * {@inheritDoc}
+     * 
+     * <em> Note: All comparisons use the segment's index only </em>
+     */
+    @Override
+    public int compareTo(Synapse arg0) {
+        return boxedIndex.compareTo(arg0.boxedIndex);
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + inputIndex;
+        result = prime * result + ((segment == null) ? 0 : segment.hashCode());
+        result = prime * result + ((sourceCell == null) ? 0 : sourceCell.hashCode());
+        result = prime * result + synapseIndex;
+        return result;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if(this == obj)
+            return true;
+        if(obj == null)
+            return false;
+        if(getClass() != obj.getClass())
+            return false;
+        Synapse other = (Synapse)obj;
+        if(inputIndex != other.inputIndex)
+            return false;
+        if(segment == null) {
+            if(other.segment != null)
+                return false;
+        } else if(!segment.equals(other.segment))
+            return false;
+        if(sourceCell == null) {
+            if(other.sourceCell != null)
+                return false;
+        } else if(!sourceCell.equals(other.sourceCell))
+            return false;
+        if(synapseIndex != other.synapseIndex)
+            return false;
+        return true;
     }
 }

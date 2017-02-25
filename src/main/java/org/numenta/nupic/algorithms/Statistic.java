@@ -22,10 +22,8 @@
 
 package org.numenta.nupic.algorithms;
 
+import org.numenta.nupic.model.Persistable;
 import org.numenta.nupic.util.NamedTuple;
-
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
  * Container to hold a specific calculation for a statistical data point.
@@ -44,7 +42,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  * </pre>
  * @author David Ray
  */
-public class Statistic {
+public class Statistic implements Persistable {
+    private static final long serialVersionUID = 1L;
+    
     public final double mean;
     public final double variance;
     public final double stdev;
@@ -58,21 +58,6 @@ public class Statistic {
         this.entries = new NamedTuple(new String[] { "mean", "variance", "stdev" }, mean, variance, stdev);
     }
     
-    /**
-     * Creates and returns a JSON ObjectNode containing this Statistic's data.
-     * 
-     * @param factory
-     * @return
-     */
-    public ObjectNode toJson(JsonNodeFactory factory) {
-        ObjectNode distribution = factory.objectNode();
-        distribution.put("mean", mean);
-        distribution.put("variance", variance);
-        distribution.put("stdev", stdev);
-        
-        return distribution;
-    }
-
     @Override
     public int hashCode() {
         final int prime = 31;

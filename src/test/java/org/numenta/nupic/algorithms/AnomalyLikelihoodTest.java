@@ -4,17 +4,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.numenta.nupic.algorithms.Anomaly.KEY_DIST;
-import static org.numenta.nupic.algorithms.Anomaly.KEY_HIST_LIKE;
 import static org.numenta.nupic.algorithms.Anomaly.KEY_MEAN;
 import static org.numenta.nupic.algorithms.Anomaly.KEY_MODE;
-import static org.numenta.nupic.algorithms.Anomaly.KEY_MVG_AVG;
 import static org.numenta.nupic.algorithms.Anomaly.KEY_STDEV;
 import static org.numenta.nupic.algorithms.Anomaly.KEY_VARIANCE;
-import gnu.trove.iterator.TDoubleIterator;
-import gnu.trove.list.array.TDoubleArrayList;
-import gnu.trove.map.TObjectDoubleMap;
-import gnu.trove.map.hash.TObjectDoubleHashMap;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,10 +22,13 @@ import org.junit.Before;
 import org.junit.Test;
 import org.numenta.nupic.algorithms.Anomaly.AveragedAnomalyRecordList;
 import org.numenta.nupic.algorithms.Anomaly.Mode;
-import org.numenta.nupic.algorithms.AnomalyLikelihood.AnomalyParams;
 import org.numenta.nupic.util.ArrayUtils;
 import org.numenta.nupic.util.Condition;
 import org.numenta.nupic.util.MersenneTwister;
+
+import gnu.trove.iterator.TDoubleIterator;
+import gnu.trove.map.TObjectDoubleMap;
+import gnu.trove.map.hash.TObjectDoubleHashMap;
 
 
 public class AnomalyLikelihoodTest {
@@ -53,7 +49,7 @@ public class AnomalyLikelihoodTest {
      * @param variance
      * @return
      */
-    private double[] sampleDistribution(Random random, double mean, double variance, int size) {
+    public static double[] sampleDistribution(Random random, double mean, double variance, int size) {
         SampleDistribution sampler = new SampleDistribution(mean, Math.sqrt(variance), size);
         return sampler.getSample(random);
     }
@@ -68,7 +64,7 @@ public class AnomalyLikelihoodTest {
      * @param metricVariance
      * @return
      */
-    private List<Sample> generateSampleData(double mean, double variance, double metricMean, double metricVariance) {
+    public static List<Sample> generateSampleData(double mean, double variance, double metricMean, double metricVariance) {
         List<Sample> retVal = new ArrayList<>();
         
         Random random = new MersenneTwister(42);
@@ -89,17 +85,28 @@ public class AnomalyLikelihoodTest {
         return retVal;
     }
     
-    private boolean assertWithinEpsilon(double a, double b) {
+    public static boolean assertWithinEpsilon(double a, double b) {
         return assertWithinEpsilon(a, b, 0.001);
     }
     
-    private boolean assertWithinEpsilon(double a, double b, double epsilon) {
+    public static boolean assertWithinEpsilon(double a, double b, double epsilon) {
         if(Math.abs(a - b) <= epsilon) {
             return true;
         }
         return false;
     }
-    
+
+	/**
+	 * This test attempts to find the anomaly-probability after create an
+	 * AnomalyLikelihood instance with default values for the learning period
+	 * and estimation samples. This used to generate an exception stating that
+	 * you must have at least one anomaly score.
+	 */
+	@Test
+	public void testConstructorWithDefaultLearningPeriodAndEstimationSamples() {
+		this.an.anomalyProbability(0.75, 0.5, null);
+	}
+
     @Test
     public void testNormalProbability() {
         TObjectDoubleMap<String> p = new TObjectDoubleHashMap<>();
@@ -237,8 +244,25 @@ public class AnomalyLikelihoodTest {
      */
     @Test
     public void testEstimateAnomalyLikelihoodsMalformedRecords() {
-        // Skipped due to impossibility of forming bad Sample objects
+        // Skipped due to impossibility of forming bad Sample objects in Java
     }
+
+	/**
+	 * This tests the anomalyProbability method with a number of calls that will
+	 * trigger copying of the sample array.
+	 */
+	@Test
+	public void testAnomalyProbabilityArrayCopying() {
+		Map<String, Object> params = new HashMap<>();
+		params.put(KEY_MODE, Mode.LIKELIHOOD);
+		params.put(AnomalyLikelihood.KEY_LEARNING_PERIOD, 300);
+		params.put(AnomalyLikelihood.KEY_ESTIMATION_SAMPLES, 300);
+		an = (AnomalyLikelihood) Anomaly.create(params);
+
+		for (int i = 0; i < 2000; i++) {
+			an.anomalyProbability(0.07, .5, null);
+		}
+	}
     
     /**
      * This calls estimateAnomalyLikelihoods with various values of skipRecords
@@ -514,32 +538,6 @@ public class AnomalyLikelihoodTest {
         successIndexes = 
             IntStream.range(0, l2b2.length).map(i -> { assertEquals(l2b2[i], l3b2[i], 0.01); return 1; }).sum();
         assertEquals(successIndexes, l2b2.length);
-    }
-    
-    /**
-     * Tests the AnomalyParams return value and its json creation
-     */
-    @Test
-    public void testAnomalyParamsToJson() {
-        AnomalyParams params = new AnomalyParams(
-            new String[] { KEY_DIST, KEY_HIST_LIKE, KEY_MVG_AVG},
-                new Statistic(0.38423985556178486, 0.009520602474199693, 0.09757357467162762),
-                new double[] { 0.460172163,0.344578258,0.344578258,0.382088578,0.460172163 },
-                new MovingAverage(
-                    new TDoubleArrayList(
-                        new double[] { 0.09528343752779542,0.5432072190186226,0.9062454498382395,0.44264021533137254,-0.009955323005220784 }),
-                    1.9774209987108093, // total 
-                    5                   // window size
-            )
-        );
-        
-        String expected = "{\"distribution\":{\"mean\":0.38423985556178486,\"variance\":0.009520602474199693,\"stdev\":0.09757357467162762},"+
-        "\"historicalLikelihoods\":[0.460172163,0.344578258,0.344578258,0.382088578,0.460172163],"+
-        "\"movingAverage\":{\"windowSize\":5,"+
-        "\"historicalValues\":[0.09528343752779542,0.5432072190186226,0.9062454498382395,0.44264021533137254,-0.009955323005220784],"+
-        "\"total\":1.9774209987108093}}";
-        
-        assertEquals(expected, params.toJson(true));
     }
     
 }

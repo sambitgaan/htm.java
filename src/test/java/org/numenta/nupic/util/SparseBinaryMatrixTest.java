@@ -32,6 +32,10 @@ import java.util.Arrays;
 import java.util.Random;
 
 import org.junit.Test;
+import org.numenta.nupic.Parameters;
+import org.numenta.nupic.Parameters.KEY;
+import org.numenta.nupic.algorithms.SpatialPooler;
+import org.numenta.nupic.model.Connections;
 
 public class SparseBinaryMatrixTest {
 
@@ -75,8 +79,8 @@ public class SparseBinaryMatrixTest {
                 sm.getSlice(0, 4);
                 fail();
             } catch (Exception e) {
-                assertEquals("This method only returns the array holding the specified index: " +
-                        Arrays.toString(new int[]{0, 4}), e.getMessage());
+                assertEquals("This method only returns the array holding the specified maximum index: " +
+                    Arrays.toString(sm.getDimensions()), e.getMessage());
             }
     }
 
@@ -96,6 +100,36 @@ public class SparseBinaryMatrixTest {
             {0, 0, 0, 1, 0, 0, 0, 0, 1, 0},
             {0, 0, 0, 0, 1, 0, 0, 0, 0, 1}};
 
+        for (int i = 0; i < sm.getDimensions()[0]; i++) {
+            for (int j = 0; j < sm.getDimensions()[1]; j++) {
+                sm.set(connectedSynapses[i][j], i, j);
+            }
+        }
+
+        for (int i = 0; i < 5; i++) {
+            for (int j = 0; j < 10; j++) {
+                assertEquals(connectedSynapses[i][j], sm.getIntValue(i, j));
+            }
+        }
+
+        int[] inputVector = new int[]{1, 0, 1, 0, 1, 0, 1, 0, 1, 0};
+        int[] results = new int[5];
+        int[] trueResults = new int[]{1, 1, 1, 1, 1};
+        sm.rightVecSumAtNZ(inputVector, results);
+
+        for (int i = 0; i < results.length; i++) {
+            assertEquals(trueResults[i], results[i]);
+        }
+
+        ///////////////////////
+
+        connectedSynapses = new int[][]{
+            {1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+            {0, 0, 1, 1, 1, 1, 1, 1, 1, 1},
+            {0, 0, 0, 0, 1, 1, 1, 1, 1, 1},
+            {0, 0, 0, 0, 0, 0, 1, 1, 1, 1},
+            {0, 0, 0, 0, 0, 0, 0, 0, 1, 1}};
+            sm = new SparseBinaryMatrix(dimensions);
             for (int i = 0; i < sm.getDimensions()[0]; i++) {
                 for (int j = 0; j < sm.getDimensions()[1]; j++) {
                     sm.set(connectedSynapses[i][j], i, j);
@@ -108,44 +142,14 @@ public class SparseBinaryMatrixTest {
                 }
             }
 
-            int[] inputVector = new int[]{1, 0, 1, 0, 1, 0, 1, 0, 1, 0};
-            int[] results = new int[5];
-            int[] trueResults = new int[]{1, 1, 1, 1, 1};
+            inputVector = new int[]{1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+            results = new int[5];
+            trueResults = new int[]{10, 8, 6, 4, 2};
             sm.rightVecSumAtNZ(inputVector, results);
 
             for (int i = 0; i < results.length; i++) {
                 assertEquals(trueResults[i], results[i]);
             }
-
-            ///////////////////////
-
-            connectedSynapses = new int[][]{
-                {1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-                {0, 0, 1, 1, 1, 1, 1, 1, 1, 1},
-                {0, 0, 0, 0, 1, 1, 1, 1, 1, 1},
-                {0, 0, 0, 0, 0, 0, 1, 1, 1, 1},
-                {0, 0, 0, 0, 0, 0, 0, 0, 1, 1}};
-                sm = new SparseBinaryMatrix(dimensions);
-                for (int i = 0; i < sm.getDimensions()[0]; i++) {
-                    for (int j = 0; j < sm.getDimensions()[1]; j++) {
-                        sm.set(connectedSynapses[i][j], i, j);
-                    }
-                }
-
-                for (int i = 0; i < 5; i++) {
-                    for (int j = 0; j < 10; j++) {
-                        assertEquals(connectedSynapses[i][j], sm.getIntValue(i, j));
-                    }
-                }
-
-                inputVector = new int[]{1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
-                results = new int[5];
-                trueResults = new int[]{10, 8, 6, 4, 2};
-                sm.rightVecSumAtNZ(inputVector, results);
-
-                for (int i = 0; i < results.length; i++) {
-                    assertEquals(trueResults[i], results[i]);
-                }
     }
 
     @Test
@@ -220,6 +224,7 @@ public class SparseBinaryMatrixTest {
         }
         System.out.println("slice:" + ArrayUtils.intArrayToString(slice));
         assertEquals(1, slice[4]);
+        
         /*update first row to true, other to false*/
         for (int i = 0; i < 5; i++) {
             for (int j = 0; j < 5; j++) {
@@ -331,5 +336,85 @@ public class SparseBinaryMatrixTest {
         }
         
         return sm;
+    }
+    
+    @Test
+    public void testCalculateOverlap() {
+        doTestCalculateOverlap(new SparseBinaryMatrix(this.dimensions));
+        doTestCalculateOverlap(new LowMemorySparseBinaryMatrix(this.dimensions));
+        doTestCalculateOverlap(new FastConnectionsMatrix(this.dimensions));
+    }
+    
+    private void doTestCalculateOverlap(AbstractSparseBinaryMatrix sm) {
+        setupParameters();
+        parameters.setInputDimensions(new int[] { 10 });
+        parameters.setColumnDimensions(new int[] { 5 });
+        initSP();
+        
+        ///////////////////
+        // test stimulsThreshold = 2
+        parameters.set(KEY.STIMULUS_THRESHOLD, 3.0);
+        initSP();
+        
+        int[][] connectedSynapses = new int[][] {
+          {1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+          {0, 0, 1, 1, 1, 1, 1, 1, 1, 1},
+          {0, 0, 0, 0, 1, 1, 1, 1, 1, 1},
+          {0, 0, 0, 0, 0, 0, 1, 1, 1, 1},
+          {0, 0, 0, 0, 0, 0, 0, 0, 1, 1}};
+        
+        for(int i = 0;i < sm.getDimensions()[0];i++) {
+          for(int j = 0;j < sm.getDimensions()[1];j++) {
+              sm.set(connectedSynapses[i][j], i, j);
+          }
+        }
+        
+        mem.setConnectedMatrix(sm);
+        
+        for(int i = 0;i < 5;i++) {
+          for(int j = 0;j < 10;j++) {
+              assertEquals(connectedSynapses[i][j], sm.getIntValue(i, j));
+          }
+        }
+        
+        int[] inputVector = new int[] { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+        int[] overlaps = sp.calculateOverlap(mem, inputVector);
+        int[] trueOverlaps = new int[] { 10, 8, 6, 4, 0 }; // last gets squelched by stimulus threshold of 3
+        double[] overlapsPct = sp.calculateOverlapPct(mem, overlaps);
+        double[] trueOverlapsPct = new double[] { 1, 1, 1, 1, 0 };
+        assertTrue(Arrays.equals(trueOverlaps, overlaps));
+        assertTrue(Arrays.equals(trueOverlapsPct, overlapsPct));
+    }
+    
+    private Parameters parameters;
+    private SpatialPooler sp;
+    private Connections mem;
+    
+    public void setupParameters() {
+        parameters = Parameters.getAllDefaultParameters();
+        parameters.set(KEY.INPUT_DIMENSIONS, new int[] { 5 });//5
+        parameters.set(KEY.COLUMN_DIMENSIONS, new int[] { 5 });//5
+        parameters.set(KEY.POTENTIAL_RADIUS, 3);//3
+        parameters.set(KEY.POTENTIAL_PCT, 0.5);//0.5
+        parameters.set(KEY.GLOBAL_INHIBITION, false);
+        parameters.set(KEY.LOCAL_AREA_DENSITY, -1.0);
+        parameters.set(KEY.NUM_ACTIVE_COLUMNS_PER_INH_AREA, 3.0);
+        parameters.set(KEY.STIMULUS_THRESHOLD, 1.0);
+        parameters.set(KEY.SYN_PERM_INACTIVE_DEC, 0.01);
+        parameters.set(KEY.SYN_PERM_ACTIVE_INC, 0.1);
+        parameters.set(KEY.SYN_PERM_TRIM_THRESHOLD, 0.05);
+        parameters.set(KEY.SYN_PERM_CONNECTED, 0.1);
+        parameters.set(KEY.MIN_PCT_OVERLAP_DUTY_CYCLES, 0.1);
+        parameters.set(KEY.MIN_PCT_ACTIVE_DUTY_CYCLES, 0.1);
+        parameters.set(KEY.DUTY_CYCLE_PERIOD, 10);
+        parameters.set(KEY.MAX_BOOST, 10.0);
+        parameters.set(KEY.SEED, 42);
+    }
+
+    private void initSP() {
+        sp = new SpatialPooler();
+        mem = new Connections();
+        parameters.apply(mem);
+        sp.init(mem);
     }
 }

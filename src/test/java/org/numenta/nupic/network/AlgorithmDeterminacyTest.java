@@ -30,16 +30,16 @@ import java.util.Map;
 
 import org.junit.AfterClass;
 import org.junit.Test;
-import org.numenta.nupic.ComputeCycle;
-import org.numenta.nupic.Connections;
 import org.numenta.nupic.Parameters;
 import org.numenta.nupic.Parameters.KEY;
-import org.numenta.nupic.SDR;
 import org.numenta.nupic.algorithms.TemporalMemory;
 import org.numenta.nupic.model.Cell;
 import org.numenta.nupic.model.Column;
+import org.numenta.nupic.model.ComputeCycle;
 import org.numenta.nupic.model.DistalDendrite;
+import org.numenta.nupic.model.Connections;
 import org.numenta.nupic.model.ProximalDendrite;
+import org.numenta.nupic.model.SDR;
 import org.numenta.nupic.model.Segment;
 import org.numenta.nupic.network.sensor.ObservableSensor;
 import org.numenta.nupic.network.sensor.Publisher;
@@ -60,7 +60,7 @@ import rx.Subscriber;
  * 3 modes:</p><p>
  * <ol>
  *  <li>Straight through the TM algorithm class</li>
- *  <li>Using a Layer in with synchronous calls</li>
+ *  <li>Using a Layer with synchronous calls</li>
  *  <li>Using the full NAPI and starting the Layer's thread</li>
  * </ol>
  * <p>
@@ -79,37 +79,36 @@ public class AlgorithmDeterminacyTest {
     
     public static Parameters getParameters() {
         Parameters parameters = Parameters.getAllDefaultParameters();
-        parameters.setParameterByKey(KEY.INPUT_DIMENSIONS, new int[] { 8 });
-        parameters.setParameterByKey(KEY.COLUMN_DIMENSIONS, new int[] { 20 });
-        parameters.setParameterByKey(KEY.CELLS_PER_COLUMN, 6);
+        parameters.set(KEY.INPUT_DIMENSIONS, new int[] { 8 });
+        parameters.set(KEY.COLUMN_DIMENSIONS, new int[] { 20 });
+        parameters.set(KEY.CELLS_PER_COLUMN, 6);
         
         //SpatialPooler specific
-        parameters.setParameterByKey(KEY.POTENTIAL_RADIUS, 12);//3
-        parameters.setParameterByKey(KEY.POTENTIAL_PCT, 0.5);//0.5
-        parameters.setParameterByKey(KEY.GLOBAL_INHIBITION, false);
-        parameters.setParameterByKey(KEY.LOCAL_AREA_DENSITY, -1.0);
-        parameters.setParameterByKey(KEY.NUM_ACTIVE_COLUMNS_PER_INH_AREA, 5.0);
-        parameters.setParameterByKey(KEY.STIMULUS_THRESHOLD, 1.0);
-        parameters.setParameterByKey(KEY.SYN_PERM_INACTIVE_DEC, 0.01);
-        parameters.setParameterByKey(KEY.SYN_PERM_ACTIVE_INC, 0.1);
-        parameters.setParameterByKey(KEY.SYN_PERM_TRIM_THRESHOLD, 0.05);
-        parameters.setParameterByKey(KEY.SYN_PERM_CONNECTED, 0.1);
-        parameters.setParameterByKey(KEY.MIN_PCT_OVERLAP_DUTY_CYCLE, 0.1);
-        parameters.setParameterByKey(KEY.MIN_PCT_ACTIVE_DUTY_CYCLE, 0.1);
-        parameters.setParameterByKey(KEY.DUTY_CYCLE_PERIOD, 10);
-        parameters.setParameterByKey(KEY.MAX_BOOST, 10.0);
-        parameters.setParameterByKey(KEY.SEED, 42);
-        parameters.setParameterByKey(KEY.SP_VERBOSITY, 0);
+        parameters.set(KEY.POTENTIAL_RADIUS, 12);//3
+        parameters.set(KEY.POTENTIAL_PCT, 0.5);//0.5
+        parameters.set(KEY.GLOBAL_INHIBITION, false);
+        parameters.set(KEY.LOCAL_AREA_DENSITY, -1.0);
+        parameters.set(KEY.NUM_ACTIVE_COLUMNS_PER_INH_AREA, 5.0);
+        parameters.set(KEY.STIMULUS_THRESHOLD, 1.0);
+        parameters.set(KEY.SYN_PERM_INACTIVE_DEC, 0.01);
+        parameters.set(KEY.SYN_PERM_ACTIVE_INC, 0.1);
+        parameters.set(KEY.SYN_PERM_TRIM_THRESHOLD, 0.05);
+        parameters.set(KEY.SYN_PERM_CONNECTED, 0.1);
+        parameters.set(KEY.MIN_PCT_OVERLAP_DUTY_CYCLES, 0.1);
+        parameters.set(KEY.MIN_PCT_ACTIVE_DUTY_CYCLES, 0.1);
+        parameters.set(KEY.DUTY_CYCLE_PERIOD, 10);
+        parameters.set(KEY.MAX_BOOST, 10.0);
+        parameters.set(KEY.SEED, 42);
         
         //Temporal Memory specific
-        parameters.setParameterByKey(KEY.INITIAL_PERMANENCE, 0.2);
-        parameters.setParameterByKey(KEY.CONNECTED_PERMANENCE, 0.8);
-        parameters.setParameterByKey(KEY.MIN_THRESHOLD, 5);
-        parameters.setParameterByKey(KEY.MAX_NEW_SYNAPSE_COUNT, 6);
-        parameters.setParameterByKey(KEY.PERMANENCE_INCREMENT, 0.05);
-        parameters.setParameterByKey(KEY.PERMANENCE_DECREMENT, 0.05);
-        parameters.setParameterByKey(KEY.ACTIVATION_THRESHOLD, 4);
-        parameters.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
+        parameters.set(KEY.INITIAL_PERMANENCE, 0.2);
+        parameters.set(KEY.CONNECTED_PERMANENCE, 0.8);
+        parameters.set(KEY.MIN_THRESHOLD, 5);
+        parameters.set(KEY.MAX_NEW_SYNAPSE_COUNT, 6);
+        parameters.set(KEY.PERMANENCE_INCREMENT, 0.05);
+        parameters.set(KEY.PERMANENCE_DECREMENT, 0.05);
+        parameters.set(KEY.ACTIVATION_THRESHOLD, 4);
+        parameters.set(KEY.RANDOM, new MersenneTwister(42));
         
         return parameters;
     }
@@ -138,7 +137,7 @@ public class AlgorithmDeterminacyTest {
         Connections con = new Connections();
         p.apply(con);
         TemporalMemory tm = new TemporalMemory();
-        tm.init(con);
+        TemporalMemory.init(con);
         
         ComputeCycle cc = null;
         for(int x = 0;x < 602;x++) {
@@ -220,7 +219,7 @@ public class AlgorithmDeterminacyTest {
                         "darr",               // fieldType (dense array as opposed to sparse array or "sarr")
                         "SDRPassThroughEncoder"); // encoderType
         
-        p.setParameterByKey(KEY.FIELD_ENCODING_MAP, settings);
+        p.set(KEY.FIELD_ENCODING_MAP, settings);
         
         Network network = Network.create("test network", p)
             .add(Network.createRegion("r1")
@@ -270,24 +269,24 @@ public class AlgorithmDeterminacyTest {
         //Test Segment equality
         Column column1 = new Column(2, 0);
         Cell cell1 = new Cell(column1, 0);
-        Segment s1 = new DistalDendrite(cell1, 0);
+        Segment s1 = new DistalDendrite(cell1, 0, 1, 0);
         assertTrue(s1.equals(s1)); // test ==
         assertFalse(s1.equals(null));
         
-        Segment s2 = new DistalDendrite(cell1, 0);
+        Segment s2 = new DistalDendrite(cell1, 0, 1, 0);
         assertTrue(s1.equals(s2));
         
         Cell cell2 = new Cell(column1, 0);
-        Segment s3 = new DistalDendrite(cell2, 0);
+        Segment s3 = new DistalDendrite(cell2, 0, 1, 0);
         assertTrue(s1.equals(s3));        
         
         //Segment's Cell has different index
         Cell cell3 = new Cell(column1, 1);
-        Segment s4 = new DistalDendrite(cell3, 0);
+        Segment s4 = new DistalDendrite(cell3, 0, 1, 0);
         assertFalse(s1.equals(s4));
         
         //Segment has different index
-        Segment s5 = new DistalDendrite(cell3, 1);
+        Segment s5 = new DistalDendrite(cell3, 1, 1, 0);
         assertFalse(s4.equals(s5));
         assertTrue(s5.toString().equals("1"));
         assertEquals(-1, s4.compareTo(s5));

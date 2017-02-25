@@ -25,6 +25,8 @@ package org.numenta.nupic.util;
 import java.lang.reflect.Array;
 import java.util.Arrays;
 
+import org.numenta.nupic.model.Persistable;
+
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 
@@ -34,7 +36,9 @@ import gnu.trove.set.hash.TIntHashSet;
  * 
  * @author Jose Luis Martin
  */
-public class LowMemorySparseBinaryMatrix extends AbstractSparseBinaryMatrix {
+public class LowMemorySparseBinaryMatrix extends AbstractSparseBinaryMatrix implements Persistable {
+    /** keep it simple */
+    private static final long serialVersionUID = 1L;
     
     private TIntSet sparseSet = new TIntHashSet();
 
@@ -99,6 +103,36 @@ public class LowMemorySparseBinaryMatrix extends AbstractSparseBinaryMatrix {
             }
         }
     }
+    
+    @Override
+    public void rightVecSumAtNZ(int[] inputVector, int[] results, double stimulusThreshold) {
+        if (this.dimensions.length > 1) {
+            int[] values = getSparseIndices();
+            for (int i = 0;i < values.length;i++) {
+                int[] coordinates = computeCoordinates(values[i]);
+                
+                if(inputVector[coordinates[1]]  != 0)
+                    results[coordinates[0]] += 1;
+                
+                if(i == values.length - 1 && results[coordinates[0]] < stimulusThreshold) {
+                    results[coordinates[0]] = 0;
+                }
+            }
+        }
+        else {
+            for(int i = 0; i < this.dimensions[0]; i++) {
+                results[0] += (inputVector[i] * (int) get(i));
+            }
+
+            for (int i = 0; i < this.dimensions[0]; i++) {
+                results[i] = results[0];
+                
+                if(i == this.dimensions[0] - 1 && results[i] < stimulusThreshold) {
+                    results[i] = 0;
+                }
+            }
+        }
+    }
 
     @Override
     public LowMemorySparseBinaryMatrix set(int value, int... coordinates) {
@@ -147,6 +181,37 @@ public class LowMemorySparseBinaryMatrix extends AbstractSparseBinaryMatrix {
     @Override
     public Integer get(int index) {
        return this.sparseSet.contains(index) ? 1 : 0;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((sparseSet == null) ? 0 : sparseSet.hashCode());
+        return result;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if(this == obj)
+            return true;
+        if(obj == null)
+            return false;
+        if(getClass() != obj.getClass())
+            return false;
+        LowMemorySparseBinaryMatrix other = (LowMemorySparseBinaryMatrix)obj;
+        if(sparseSet == null) {
+            if(other.sparseSet != null)
+                return false;
+        } else if(!sparseSet.equals(other.sparseSet))
+            return false;
+        return true;
     }
 
 }

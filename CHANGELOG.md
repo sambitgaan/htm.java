@@ -13,11 +13,82 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ***
 
-## Unreleased [0.6.6-SNAPSHOT]
+## Unreleased [0.6.10-SNAPSHOT]
 #### Removed
+#### Added
+#### Changed  
+* [[PR #496](https://github.com/numenta/htm.java/pull/496)] Moved ```Connections.java``` and ```ComputeCycle.java``` and other "model" files to package: org.numenta.nupic.model
+* [[PR #496](https://github.com/numenta/htm.java/pull/496)] Updated the TemporalMemory and all unit/compatibility tests to be in sync with latest NuPIC version (Updated: 2016-09-23 SHA 1036f25e7223471d72cebc536d6734f78d37b6c7)
+* [[PR #486](https://github.com/numenta/htm.java/pull/486)] Updated the SpatialPooler and all unit/compatibility tests to be in sync with latest NuPIC version (Updated: 2016-09-22 SHA a3587db662ddc365ed371c81eb4166a41ad4bc3d)  
+
+#### Fixed
+
+***
+
+## [v0.6.9-alpha] - 2016-09-29
+#### Removed
+* [[Issues #471](https://github.com/numenta/htm.java/issues/471)] Removed all references to "verbosity" in Connections and Parameters classes
+* [[Issues #470](https://github.com/numenta/htm.java/issues/470)] Removed old JSON serializer/deserializer from CLAClassifer 
+* All references to "Verbosity" as its a Python convention and not Java
+* JSON CLAClassifier serializer / deserializer, replaced with new PersistenceAPI
+
+#### Added
+* [[PR #480](https://github.com/numenta/htm.java/pull/480)] Added new RDSECompatibilityTest
+* [[PR #478](https://github.com/numenta/htm.java/pull/478)] Added Post-init method to Connections to correct non-initialized derived SpatialPooler parameters.
+* [[PR #467](https://github.com/numenta/htm.java/pull/467)] Added new SpatialPoolerCompatibilityTest
+* Added new SpatialPooler class
+* Added new SpatialPoolerTest class
+* Added new TemporalMemory class 
+* Added new TemporalMemoryTest class
+* Added ```Connections.getPrintString()``` to return parameter printout
+* Parameters key ```Parameters.KEY.MAX_SEGMENTS_PER_CELL```
+* Parameters key ```Parameters.KEY.MAX_NEW_SYNAPSE_COUNT```
+* Added new ```UniversalRandom``` RNG which has an [allegory in python](https://gist.github.com/cogmission/c4cb8feaba19595dae8ff964e18b05d0#file-universal_random-py) which can be used to compare versions 
+* Added new methods on the MTJ matrices to add and remove rows and columns
+* Added new Algorithm Foundry culled jar containing Sandia wrapper for the MTJ linear algebra lib
+* [[PR #453](https://github.com/numenta/htm.java/pull/453)] Added gradlew functionality for quick builds from scratch without any prior installation of Java or Gradle.
+* [[PR #439](https://github.com/numenta/htm.java/pull/439)] **Added a new SDRClassifier !!!**
+* [[PR #435](https://github.com/numenta/htm.java/pull/435)] Added ObservableTestBase class for improved AssertFailure detection in tests using Observables 
+
+#### Changed
+* ```Connections.apply()``` now sets the seed value from the ```Parameters``` object.
+* Parameters.(g|s)etParameterByKey to simplified get() / set()
+* ```KEY.MIN_PCT_OVERLAP_DUTY_CYCLE``` to ```KEY.MIN_PCT_OVERLAP_DUTY_CYCLES```
+* ```KEY.MIN_PCT_ACTIVE_DUTY_CYCLE``` to ```KEY.MIN_PCT_ACTIVE_DUTY_CYCLES```
+
+#### Fixed
+* [[Issues #468](https://github.com/numenta/htm.java/issues/468)] Parameters.checkRange now checks values "at" the range boundary as well.
+* Fixed documentation of SpatialPooler.inhibitColumnsLocal - added parameter documentation
+* [[PR #451](https://github.com/numenta/htm.java/pull/451)] Fixed not filled overlaps array in updateDutyCycles in SP
+* [[PR #435](https://github.com/numenta/htm.java/pull/435)] Fixed AssertFailure detection within onNext() method in NAPI Observable tests
+* [[PR #431](https://github.com/numenta/htm.java/pull/431)] BitHistory re-scaling fix (in CLAClassifier functionality)
+* [[PR #431](https://github.com/numenta/htm.java/pull/431)] Cleaned up tabs and spaces in BitHistory
+
+***
+
+## [v0.6.8-alpha] - 2016-05-02
+#### Changed
+* [[PR #419](https://github.com/numenta/htm.java/pull/419)] Added additional check for running thread before calling halt during ```store()``` operation. This avoids calling ```halt()``` via the ```Persistable``` interface during serialize calls of ```HTMObjectOutput``` for our partners at [flink-htm](https://github.com/nupic-community/flink-htm)
+* [[Issue #418](https://github.com/numenta/htm.java/issues/418)] Internal change to ```HTMObjectOutput``` and ```HTMObjectInput``` constructors to pass in the ```FSTConfiguration``` to avoid creating it twice.
+* [[PR #419](https://github.com/numenta/htm.java/pull/419)] Changed default mode of Gradle build script to **not** write debug output to standard out
+
+***
+
+## [v0.6.6-alpha] - 2016-04-14
+#### Removed
+* [[PR #384](https://github.com/numenta/htm.java/pull/384)] Removed obsolete demo jars which are in htm.java-examples and don't need to be here.
 * Removed setSpVerbosity() method from Parameters.java
 
 #### Added
+* [[PR #412](https://github.com/numenta/htm.java/pull/412)]  Added new PersistenceAPI (includes serialization; stream handling; new classes and new "serialize" package)
+* [[PR #412](https://github.com/numenta/htm.java/pull/412)] Added changes to build script for forcing tests to run when source hasn't changed
+* [[PR #412](https://github.com/numenta/htm.java/pull/412)] Added changes to build script for easy turn on of debug output
+* [[PR #405](https://github.com/numenta/htm.java/pull/402)] Added new [Docker File reference-build environment](https://github.com/numenta/htm.java/wiki/Build-Instructions#reference-build-environment)!
+* [[PR #397](https://github.com/numenta/htm.java/pull/397)] Added close() method to the Network class to bring it inline with Region & Layer - Added Tests for new functionality. (@Mandarx)
+* [[PR #396](https://github.com/numenta/htm.java/pull/396)] Added Local.US to MetricsTrace to ensure (expected) dots.
+* [[PR #386](https://github.com/numenta/htm.java/pull/386)] Added test for close() method in LayerTest
+* [[PR #378](https://github.com/numenta/htm.java/pull/378)] Added more utility methods to ArrayUtils in prep for KNNClassifier development
+* [[PR #375](https://github.com/numenta/htm.java/pull 375)] Added new override of rightVecSumAtNZ() method to Matrix classes.
 * [[PR #373](https://github.com/numenta/htm.java/pull/373)] Added "activeCells" field and to ManualInput.copy()
 * [[PR #370](https://github.com/numenta/htm.java/pull/370)] Added FastRandom implementation (yields 2x speed increase to codebase!) from MoClu's (@antidata)
 * [[PR #370](https://github.com/numenta/htm.java/pull/370)] Added Tests for FastRandom (util package)
@@ -25,12 +96,20 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 * [[PR #364](https://github.com/numenta/htm.java/pull/364)] Added 15min Hot Gym data file.
 
 #### Changed
+* [[PR #412](https://github.com/numenta/htm.java/pull/412)] Renamed class EncoderResult to Encoding
+* [[PR #412](https://github.com/numenta/htm.java/pull/412)] Renamed class ClassifierResult to Classification
+* [[PR #404](https://github.com/numenta/htm.java/pull/404)] LayerTest & PALayerTest, subscribe() and start() call order to eliminate Thread Race Condition and run on [OpenJDK](http://openjdk.java.net)
+* (3-1-2016) Updated htm.java-examples for change to GLOBAL_INHIBITION parameter (sync)
+* [[PR #391](https://github.com/numenta/htm.java/pull/391)] Incremented the Gradle Shade Plugin version to 1.2.3
+* [[PR #379](https://github.com/numenta/htm.java/pull/379)] Changed SYN_PERM_THRESHOLD to be in line with SYN_PERM_CONNECTED
+* [[PR #375](https://github.com/numenta/htm.java/pull 375)] Optimized SpatialPooler.calculateOverlaps by adding the stimulus threshold to the rightVecSumAtNZ() method so we only loop once instead of twice.
 * [[PR #373](https://github.com/numenta/htm.java/pull/373)] Changed Matrix class hierarchy naming from XXXSupport to AbstractXXX - more conventional
 * [[PR #373](https://github.com/numenta/htm.java/pull/373)] Parameters.KEY_GLOBALINHIBITIONS to KEY_GLOBALINHIBITION
 * [[PR #365](https://github.com/numenta/htm.java/pull/365)] Changed inhibitColumnsGlobal() to use Java 8 Streams - 50% performance increase! Fixes [Issue #354](https://github.com/numenta/htm.java/issues/354)
 * [[PR #370](https://github.com/numenta/htm.java/pull/370)] Changed Connections initialization to be able to specify RNG implementation from Parameters value.
 
 #### Fixed
+* [[PR #386](https://github.com/numenta/htm.java/pull/386)] Fixed floating point problem in Layer dimension inference
 * [[PR #373](https://github.com/numenta/htm.java/pull/373)] Rooted out cause of codebase indeterminacy!
 * [[PR #360](https://github.com/numenta/htm.java/pull/360)] Fixed dayOfWeek to accept fractional values.
 * [[PR #362](https://github.com/numenta/htm.java/pull/362)] Fix for Generic Observable execution order. Fixes [Issue #363](https://github.com/numenta/htm.java/issues/363)

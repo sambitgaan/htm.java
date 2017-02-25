@@ -33,8 +33,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.numenta.nupic.Connections;
 import org.numenta.nupic.FieldMetaType;
+import org.numenta.nupic.model.Connections;
 import org.numenta.nupic.util.ArrayUtils;
 import org.numenta.nupic.util.Condition;
 import org.numenta.nupic.util.MinMax;
@@ -159,6 +159,8 @@ import org.slf4j.LoggerFactory;
  */
 public class ScalarEncoder extends Encoder<Double> {
 
+	private static final long serialVersionUID = 1L;
+    
 	private static final Logger LOGGER = LoggerFactory.getLogger(ScalarEncoder.class);
 
 	/**
@@ -308,16 +310,18 @@ public class ScalarEncoder extends Encoder<Double> {
 	 * @return			an encoded array
 	 */
 	public Integer getFirstOnBit(double input) {
-		if(input == SENTINEL_VALUE_FOR_MISSING_DATA) {
+		if(Double.isNaN(input)) {
 			return null;
 		}else{
 			if(input < getMinVal()) {
 				if(clipInput() && !isPeriodic()) {
-					LOGGER.info("Clipped input " + getName() + "=" + input + " to minval " + getMinVal());
+				    if(LOGGER.isTraceEnabled()) {
+				        LOGGER.info("Clipped input " + getName() + "=" + input + " to minval " + getMinVal());
+				    }
 					input = getMinVal();
 				}else{
 					throw new IllegalStateException("input (" + input +") less than range (" +
-						getMinVal() + " - " + getMaxVal());
+						getMinVal() + " - " + getMaxVal() + ")");
 				}
 			}
 		}
@@ -325,16 +329,18 @@ public class ScalarEncoder extends Encoder<Double> {
 		if(isPeriodic()) {
 			if(input >= getMaxVal()) {
 				throw new IllegalStateException("input (" + input +") greater than periodic range (" +
-					getMinVal() + " - " + getMaxVal());
+					getMinVal() + " - " + getMaxVal() + ")");
 			}
 		}else{
 			if(input > getMaxVal()) {
 				if(clipInput()) {
-					LOGGER.info("Clipped input " + getName() + "=" + input + " to maxval " + getMaxVal());
+				    if(LOGGER.isTraceEnabled()) {
+				        LOGGER.info("Clipped input " + getName() + "=" + input + " to maxval " + getMaxVal());
+				    }
 					input = getMaxVal();
 				}else{
 					throw new IllegalStateException("input (" + input +") greater than periodic range (" +
-						getMinVal() + " - " + getMaxVal());
+						getMinVal() + " - " + getMaxVal() + ")");
 				}
 			}
 		}
@@ -735,7 +741,7 @@ public class ScalarEncoder extends Encoder<Double> {
 	 * {@inheritDoc}
 	 */
 	@Override
-	public List<EncoderResult> getBucketInfo(int[] buckets) {
+	public List<Encoding> getBucketInfo(int[] buckets) {
 		SparseObjectMatrix<int[]> topDownMapping = getTopDownMapping();
 
 		//The "category" is simply the bucket index
@@ -750,14 +756,14 @@ public class ScalarEncoder extends Encoder<Double> {
 			inputVal = getMinVal() + category * getResolution();
 		}
 
-		return Arrays.asList(new EncoderResult(inputVal, inputVal, encoding));
+		return Arrays.asList(new Encoding(inputVal, inputVal, encoding));
 	}
 
 	/**
 	 * {@inheritDoc}
 	 */
 	@Override
-	public List<EncoderResult> topDownCompute(int[] encoded) {
+	public List<Encoding> topDownCompute(int[] encoded) {
 		//Get/generate the topDown mapping table
 		SparseObjectMatrix<int[]> topDownMapping = getTopDownMapping();
 

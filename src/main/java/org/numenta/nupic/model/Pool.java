@@ -22,12 +22,13 @@
 
 package org.numenta.nupic.model;
 
+import java.util.stream.IntStream;
+
+import org.numenta.nupic.util.ArrayUtils;
+
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.hash.TIntHashSet;
-
-import org.numenta.nupic.Connections;
-import org.numenta.nupic.util.ArrayUtils;
 
 /**
  * Convenience container for "bound" {@link Synapse} values
@@ -41,7 +42,10 @@ import org.numenta.nupic.util.ArrayUtils;
  * @see Synapse
  * @see Connections
  */
-public class Pool {
+public class Pool implements Persistable {
+    /** keep it simple */
+    private static final long serialVersionUID = 1L;
+    
     int size;
 
     /** Allows fast removal of connected synapse indexes. */
@@ -72,7 +76,6 @@ public class Pool {
      * @param permanence
      */
     public void setPermanence(Connections c, Synapse s, double permanence) {
-        updatePool(c, s, permanence);
         s.setPermanence(c, permanence);
     }
 
@@ -87,7 +90,7 @@ public class Pool {
         if(synapsesBySourceIndex.get(inputIndex) == null) {
             synapsesBySourceIndex.put(inputIndex, s);
         }
-        if(permanence > c.getSynPermConnected()) {
+        if(permanence >= c.getSynPermConnected()) {
             synapseConnections.add(inputIndex);
         }else {
             synapseConnections.remove(inputIndex);
@@ -148,27 +151,35 @@ public class Pool {
      * (input vector bit or lateral cell)
      * @return the sparse array
      */
-    public int[] getSparseConnections() {
-        int[] keys = ArrayUtils.reverse(synapsesBySourceIndex.keys());
-        return keys;
-    }
-
-    /**
-     * Returns a dense array representing the potential pool bits
-     * with the connected bits set to 1. 
-     * 
-     * Note: Only called from tests for now...
-     * @param c
-     * @return
-     */
-    public int[] getDenseConnections(Connections c) {
-        int[] retVal = new int[c.getNumInputs()];
-        for(int inputIndex : synapseConnections.toArray()) {
-            retVal[inputIndex] = 1;
-        }
-        return retVal;
+    public int[] getSparsePotential() {
+        return ArrayUtils.reverse(synapsesBySourceIndex.keys());
     }
     
+    /**
+     * Returns a dense binary array containing 1's where the input bits are part
+     * of this pool.
+     * @param c     the {@link Connections}
+     * @return  dense binary array of member inputs
+     */
+    public int[] getDensePotential(Connections c) {
+        return IntStream.range(0, c.getNumInputs())
+            .map(i -> synapsesBySourceIndex.containsKey(i) ? 1 : 0)
+            .toArray();
+    }
+    
+    /**
+     * Returns an binary array whose length is equal to the number of inputs;
+     * and where 1's are set in the indexes of this pool's assigned bits.
+     * 
+     * @param   c   {@link Connections}
+     * @return the sparse array
+     */
+    public int[] getDenseConnected(Connections c) {
+        return IntStream.range(0, c.getNumInputs())
+            .map(i -> synapseConnections.contains(i) ? 1 : 0)
+            .toArray();
+    }
+
     /**
      * Destroys any references this {@code Pool} maintains on behalf
      * of the specified {@link Synapse}
@@ -191,5 +202,46 @@ public class Pool {
         synapsesBySourceIndex.clear();
         synapseConnections = null;
         synapsesBySourceIndex = null;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + size;
+        result = prime * result + ((synapseConnections == null) ? 0 : synapseConnections.toString().hashCode());
+        result = prime * result + ((synapsesBySourceIndex == null) ? 0 : synapsesBySourceIndex.toString().hashCode());
+        return result;
+    }
+    
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if(this == obj)
+            return true;
+        if(obj == null)
+            return false;
+        if(getClass() != obj.getClass())
+            return false;
+        Pool other = (Pool)obj;
+        if(size != other.size)
+            return false;
+        if(synapseConnections == null) {
+            if(other.synapseConnections != null)
+                return false;
+        } else if((!synapseConnections.containsAll(other.synapseConnections) || 
+            !other.synapseConnections.containsAll(synapseConnections)))
+                return false;
+        if(synapsesBySourceIndex == null) {
+            if(other.synapsesBySourceIndex != null)
+                return false;
+        } else if(!synapsesBySourceIndex.toString().equals(other.synapsesBySourceIndex.toString()))
+            return false;
+        return true;
     }
 }

@@ -22,13 +22,13 @@
 
 package org.numenta.nupic.model;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
-import org.numenta.nupic.Connections;
 import org.numenta.nupic.algorithms.SpatialPooler;
 import org.numenta.nupic.algorithms.TemporalMemory;
 
@@ -41,7 +41,10 @@ import org.numenta.nupic.algorithms.TemporalMemory;
  * @author David Ray
  *
  */
-public class Column implements Comparable<Column> {
+public class Column implements Comparable<Column>, Serializable {
+    /** keep it simple */
+    private static final long serialVersionUID = 1L;
+    
     /** The flat non-topological index of this column */
     private final int index;
     /** Stored boxed form to eliminate need for boxing on the fly */
@@ -79,6 +82,13 @@ public class Column implements Comparable<Column> {
 
     /**
      * Returns the {@link Cell} residing at the specified index.
+     * <p>
+     * <b>IMPORTANT NOTE:</b> the index provided is the index of the Cell within this
+     * column and is <b>not</b> the actual index of the Cell within the total
+     * list of Cells of all columns. Each Cell maintains it's own <i><b>GLOBAL</i></b>
+     * index which is the index describing the occurrence of a cell within the
+     * total list of all cells. Thus, {@link Cell#getIndex()} returns the <i><b>GLOBAL</i></b>
+     * index and <b>not</b> the index within this column.
      * 
      * @param index     the index of the {@link Cell} to return.
      * @return          the {@link Cell} residing at the specified index.

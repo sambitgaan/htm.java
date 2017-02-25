@@ -170,6 +170,32 @@ public class ArrayUtils {
         }
         return retVal;
     }
+    
+    public static int maxIndex(int[] shape) {
+        return shape[0] * Math.max(1, initDimensionMultiples(shape)[0]) - 1;
+    }
+    
+    /**
+     * Returns an array of coordinates calculated from
+     * a flat index.
+     * 
+     * @param   index   specified flat index
+     * @param   shape   the array specifying the size of each dimension
+     * @param   isColumnMajor   increments row first then column (default: false)
+     * 
+     * @return  a coordinate array
+     */
+    public static int[] toCoordinates(int index, int[] shape, boolean isColumnMajor) {
+        int[] dimensionMultiples = initDimensionMultiples(shape);
+        int[] returnVal = new int[shape.length];
+        int base = index;
+        for(int i = 0;i < dimensionMultiples.length; i++) {
+            int quotient = base / dimensionMultiples[i];
+            base %= dimensionMultiples[i];
+            returnVal[i] = quotient;
+        }
+        return isColumnMajor ? reverse(returnVal) : returnVal;
+    }
 
     /**
      * Utility to compute a flat index from coordinates.
@@ -205,21 +231,246 @@ public class ArrayUtils {
      * Initializes internal helper array which is used for multidimensional
      * index computation.
      *
-     * @param dimensions
+     * @param shape     an array specifying sizes of each dimension
      * @return
      */
-    public static int[] initDimensionMultiples(int[] dimensions) {
+    public static int[] initDimensionMultiples(int[] shape) {
         int holder = 1;
-        int len = dimensions.length;
-        int[] dimensionMultiples = new int[dimensions.length];
+        int len = shape.length;
+        int[] dimensionMultiples = new int[shape.length];
         for (int i = 0; i < len; i++) {
-            holder *= (i == 0 ? 1 : dimensions[len - i]);
+            holder *= (i == 0 ? 1 : shape[len - i]);
             dimensionMultiples[len - 1 - i] = holder;
         }
         return dimensionMultiples;
     }
+    
+    /**
+     * Takes a two-dimensional input array and returns a new array which is "rotated"
+     * a quarter-turn clockwise.
+     * 
+     * @param array The array to rotate.
+     * @return The rotated array.
+     */
+    public static int[][] rotateRight(int[][] array) {
+        int r = array.length;
+        if (r == 0) {
+            return new int[0][0]; // Special case: zero-length array
+        }
+        int c = array[0].length;
+        int[][] result = new int[c][r];
+        for (int i = 0; i < r; i++) {
+            for (int j = 0; j < c; j++) {
+                result[j][r - 1 - i] = array[i][j];
+            }
+        }
+        return result;
+    }
+
 
     /**
+     * Takes a two-dimensional input array and returns a new array which is "rotated"
+     * a quarter-turn counterclockwise.
+     * 
+     * @param array The array to rotate.
+     * @return The rotated array.
+     */
+    public static int[][] rotateLeft(int[][] array) {
+        int r = array.length;
+        if (r == 0) {
+            return new int[0][0]; // Special case: zero-length array
+        }
+        int c = array[0].length;
+        int[][] result = new int[c][r];
+        for (int i = 0; i < r; i++) {
+            for (int j = 0; j < c; j++) {
+                result[c - 1 - j][i] = array[i][j];
+            }
+        }
+        return result;
+    }
+    
+    /**
+     * Takes a one-dimensional input array of m  n  numbers and returns a two-dimensional
+     * array of m rows and n columns. The first n numbers of the given array are copied
+     * into the first row of the new array, the second n numbers into the second row,
+     * and so on. This method throws an IllegalArgumentException if the length of the input
+     * array is not evenly divisible by n.
+     * 
+     * @param array The values to put into the new array.
+     * @param n The number of desired columns in the new array.
+     * @return The new m  n array.
+     * @throws IllegalArgumentException If the length of the given array is not
+     *  a multiple of n.
+     */
+    public static int[][] ravel(int[] array, int n) throws IllegalArgumentException {
+        if (array.length % n != 0) {
+            throw new IllegalArgumentException(array.length + " is not evenly divisible by " + n);
+        }
+        int length = array.length;
+        int[][] result = new int[length / n][n];
+        for (int i = 0; i < length; i++) {
+            result[i / n][i % n] = array[i];
+        }
+        return result;
+    }
+
+    /**
+     * Takes a m by n two dimensional array and returns a one-dimensional array of size m  n
+     * containing the same numbers. The first n numbers of the new array are copied from the
+     * first row of the given array, the second n numbers from the second row, and so on.
+     * 
+     * @param array The array to be unraveled.
+     * @return The values in the given array.
+     */
+    public static int[] unravel(int[][] array) {
+        int r = array.length;
+        if (r == 0) {
+            return new int[0]; // Special case: zero-length array
+        }
+        int c = array[0].length;
+        int[] result = new int[r * c];
+        int index = 0;
+        for (int i = 0; i < r; i++) {
+            for (int j = 0; j < c; j++) {
+                result[index] = array[i][j];
+                index++;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Takes a two-dimensional array of r rows and c columns and reshapes it to
+     * have (r*c)/n by n columns. The value in location [i][j] of the input array
+     * is copied into location [j][i] of the new array.
+     * 
+     * @param array The array of values to be reshaped.
+     * @param n The number of columns in the created array.
+     * @return The new (r*c)/n by n array.
+     * @throws IllegalArgumentException If r*c  is not evenly divisible by n.
+     */
+    public static int[][] reshape(int[][] array, int n) throws IllegalArgumentException {
+        int r = array.length;
+        if (r == 0) {
+            return new int[0][0]; // Special case: zero-length array
+        }
+        if ((array.length * array[0].length) % n != 0) {
+            int size = array.length * array[0].length;
+            throw new IllegalArgumentException(size + " is not evenly divisible by " + n);
+        }
+        int c = array[0].length;
+        int[][] result = new int[(r * c) / n][n];
+        int ii = 0;
+        int jj = 0;
+        
+        for (int i = 0; i < r; i++) {
+            for (int j = 0; j < c; j++) {
+                result[ii][jj] = array[i][j];
+                jj++;
+                if (jj == n) {
+                    jj = 0;
+                    ii++;
+                }
+            }
+        }
+        return result;
+    }
+    
+    /**
+     * Returns an int[] with the dimensions of the input.
+     * @param inputArray
+     * @return
+     */
+    public static int[] shape(Object inputArray) {
+        int nr = 1 + inputArray.getClass().getName().lastIndexOf('[');
+        Object oa = inputArray;
+        int[] l = new int[nr];
+        for(int i = 0;i < nr;i++) {
+            int len = l[i] = Array.getLength(oa);
+            if (0 < len) { oa = Array.get(oa, 0); }
+        }
+        
+        return l;
+    }
+    
+    /**
+     * Sorts the array, then returns an array containing the indexes of
+     * those sorted items in the original array.
+     * <p>
+     * int[] args = argsort(new int[] { 11, 2, 3, 7, 0 });
+     * contains:
+     * [4, 1, 2, 3, 0]
+     * 
+     * @param in
+     * @return
+     */
+    public static int[] argsort(int[] in) {
+        return argsort(in, -1, -1);
+    }
+    
+    /**
+     * Sorts the array, then returns an array containing the indexes of
+     * those sorted items in the original array which are between the
+     * given bounds (start=inclusive, end=exclusive)
+     * <p>
+     * int[] args = argsort(new int[] { 11, 2, 3, 7, 0 }, 0, 3);
+     * contains:
+     * [4, 1, 2]
+     * 
+     * @param in
+     * @return  the indexes of input elements filtered in the way specified
+     * 
+     * @see #argsort(int[])
+     */
+    public static int[] argsort(int[] in, int start, int end) {
+        if(start == -1 || end == -1) {
+            return IntStream.of(in).sorted().map(i -> 
+                Arrays.stream(in).boxed().collect(Collectors.toList()).indexOf(i)).toArray();
+        }
+        
+        return IntStream.of(in).sorted().map(i -> 
+            Arrays.stream(in).boxed().collect(Collectors.toList()).indexOf(i))
+                .skip(start).limit(end).toArray();
+    }
+    
+    /**
+    * Transforms 2D matrix of doubles to 1D by concatenation
+    * @param A
+    * @return
+    */
+   public static double[] to1D(double[][] A){
+       
+       double[] B = new double[A.length * A[0].length];
+       int index = 0;
+
+       for(int i = 0;i<A.length;i++){
+           for(int j = 0;j<A[0].length;j++){
+               B[index++] = A[i][j];
+           }
+       }
+       return B;
+   }
+   
+   /**
+    * Transforms 2D matrix of integers to 1D by concatenation
+    * @param A
+    * @return
+    */
+   public static int[] to1D(int[][] A){
+       
+       int[] B = new int[A.length * A[0].length];
+       int index = 0;
+
+       for(int i = 0;i < A.length;i++){
+           for(int j = 0;j < A[0].length;j++){
+               B[index++] = A[i][j];
+           }
+       }
+       return B;
+   }
+
+   /**
      * Returns a string representing an array of 0's and 1's
      *
      * @param arr an binary array (0's and 1's only)
@@ -264,11 +515,73 @@ public class ArrayUtils {
      * @param args  the array of Objects to be wrapped in {@link Tuple}s
      * @return a list of tuples
      */
+    public static List<Tuple> zip(List<?>... args) {
+        List<Tuple> tuples = new ArrayList<Tuple>();
+        
+        int min = Arrays.stream(args).mapToInt(i -> i.size()).min().orElse(0);
+        
+        int len = args.length;
+        for(int j = 0;j < min;j++) {
+            MutableTuple mt = new MutableTuple(len);
+            for (int i = 0; i < len; i++) {
+                mt.set(i, args[i].get(j));
+            }
+            tuples.add(mt);
+        }
+
+        return tuples;
+    }
+    
+    /**
+     * Return a list of tuples, where each tuple contains the i-th element
+     * from each of the argument sequences.  The returned list is
+     * truncated in length to the length of the shortest argument sequence.
+     *
+     * @param args  the array of Objects to be wrapped in {@link Tuple}s
+     * @return a list of tuples
+     */
+    public static List<Tuple> zip(int[]... args) {
+        List<Tuple> tuples = new ArrayList<Tuple>();
+        
+        int min = Arrays.stream(args).mapToInt(i -> i.length).min().orElse(0);
+        
+        int len = args.length;
+        for(int j = 0;j < min;j++) {
+            MutableTuple mt = new MutableTuple(len);
+            for (int i = 0; i < len; i++) {
+                mt.set(i, args[i][j]);
+            }
+            tuples.add(mt);
+        }
+
+        return tuples;
+    }
+    
+    /**
+     * Return a list of tuples, where each tuple contains the i-th element
+     * from each of the argument sequences.  The returned list is
+     * truncated in length to the length of the shortest argument sequence.
+     *
+     * @param args  the array of Objects to be wrapped in {@link Tuple}s
+     * @return a list of tuples
+     */
     public static List<Tuple> zip(Object[]... args) {
         List<Tuple> tuples = new ArrayList<Tuple>();
+        
+        int min = Integer.MAX_VALUE;
+        for(Object[] oa : args) {
+            if(oa.length < min) {
+                min = oa.length;
+            }
+        }
+        
         int len = args.length;
-        for (int i = 0; i < len; i++) {
-            tuples.add(new Tuple(args[i]));
+        for(int j = 0;j < min;j++) {
+            MutableTuple mt = new MutableTuple(2);
+            for (int i = 0; i < len; i++) {
+                mt.set(i, args[i][j]);
+            }
+            tuples.add(mt);
         }
 
         return tuples;
@@ -542,8 +855,8 @@ public class ArrayUtils {
      *
      * @param multiplicand
      * @param factor
-     * @param multiplicand adjustment
-     * @param factor       adjustment
+     * @param multiplicandAdjustment
+     * @param factorAdjustment
      *
      * @return
      * @throws IllegalArgumentException if the two argument arrays are not the same length
@@ -553,7 +866,7 @@ public class ArrayUtils {
 
         if (multiplicand.length != factor.length) {
             throw new IllegalArgumentException(
-                    "The multiplicand array and the factor array must be the same length");
+                "The multiplicand array and the factor array must be the same length");
         }
         double[] product = new double[multiplicand.length];
         for (int i = 0; i < multiplicand.length; i++) {
@@ -645,9 +958,10 @@ public class ArrayUtils {
      * @return
      */
     public static List<Integer> subtract(List<Integer> subtrahend, List<Integer> minuend) {
-        ArrayList<Integer> sList = new ArrayList<Integer>(minuend);
-        sList.removeAll(subtrahend);
-        return new ArrayList<Integer>(sList);
+        return IntStream.range(0, minuend.size())
+           .boxed()
+           .map(i -> minuend.get(i) - subtrahend.get(i))
+           .collect(Collectors.toList());
     }
 
     /**
@@ -956,6 +1270,21 @@ public class ArrayUtils {
     }
     
     /**
+     * Returns a new array containing the source array contents with 
+     * substitutions from "substitutes" whose indexes reside in "substInds".
+     * 
+     * @param source        the original array
+     * @param substitutes   the replacements whose indexes must be in substInds to be used.
+     * @param substInds     the indexes of "substitutes" to replace in "source"
+     * @return  a new array with the specified indexes replaced with "substitutes"
+     */
+    public static int[] subst(int[] source, int[] substitutes, int[] substInds) {
+        List<Integer> l = Arrays.stream(substInds).boxed().collect(Collectors.toList());
+        return IntStream.range(0, source.length).map(
+            i -> l.indexOf(i) == -1 ? source[i] : substitutes[i]).toArray();
+    }
+    
+    /**
      * Returns a sorted unique array of integers
      *
      * @param nums an unsorted array of integers with possible duplicates.
@@ -1070,19 +1399,39 @@ public class ArrayUtils {
      * @param random     a random number generator
      * @return a sample of numbers of the specified size
      */
-    public static int[] sample(int sampleSize, TIntArrayList choices, Random random) {
-        TIntHashSet temp = new TIntHashSet();
+    public static int[] sample(TIntArrayList choices, int[] selectedIndices, Random random) {
+        TIntArrayList choiceSupply = new TIntArrayList(choices);
         int upperBound = choices.size();
-        for (int i = 0; i < sampleSize; i++) {
+        for (int i = 0; i < selectedIndices.length; i++) {
             int randomIdx = random.nextInt(upperBound);
-            while (temp.contains(choices.get(randomIdx))) {
-                randomIdx = random.nextInt(upperBound);
-            }
-            temp.add(choices.get(randomIdx));
+            selectedIndices[i] = (choiceSupply.removeAt(randomIdx));
+            upperBound--;
         }
-        TIntArrayList al = new TIntArrayList(temp);
-        al.sort();
-        return al.toArray();
+        Arrays.sort(selectedIndices);
+        //System.out.println("sample: " + Arrays.toString(selectedIndices));
+        return selectedIndices;
+    }
+    
+    /**
+     * Returns a random, sorted, and  unique array of the specified sample size of
+     * selections from the specified list of choices.
+     *
+     * @param sampleSize the number of selections in the returned sample
+     * @param choices    the list of choices to select from
+     * @param random     a random number generator
+     * @return a sample of numbers of the specified size
+     */
+    public static int[] sample(int[] choices, int[] selectedIndices, Random random) {
+        TIntArrayList choiceSupply = new TIntArrayList(choices);
+        int upperBound = choices.length;
+        for (int i = 0; i < selectedIndices.length; i++) {
+            int randomIdx = random.nextInt(upperBound);
+            selectedIndices[i] = (choiceSupply.removeAt(randomIdx));
+            upperBound--;
+        }
+        Arrays.sort(selectedIndices);
+        //System.out.println("sample: " + Arrays.toString(selectedIndices));
+        return selectedIndices;
     }
 
     /**
@@ -1166,6 +1515,26 @@ public class ArrayUtils {
 
         return count;
     }
+    
+    /**
+     * Returns the count of values in the specified array that are
+     * greater than or equal to, the specified compare value.
+     *
+     * @param compare the value to compare to
+     * @param array   the values being compared
+     *
+     * @return the count of values greater
+     */
+    public static int valueGreaterOrEqualCount(double compare, double[] array) {
+        int count = 0;
+        for (int i = 0; i < array.length; i++) {
+            if (array[i] >= compare) {
+                count++;
+            }
+        }
+
+        return count;
+    }
 
     /**
      * Returns the count of values in the specified array that are
@@ -1212,7 +1581,7 @@ public class ArrayUtils {
         }
         return retVal;
     }
-
+    
     /**
      * Raises the values in the specified array by the amount specified
      * @param amount the amount to raise the values
@@ -1451,6 +1820,21 @@ public class ArrayUtils {
     }
 
     /**
+     * Sets value to "y" in "targetB" if the value in the same index in "sourceA" is bigger than "x".
+     * @param sourceA array to compare elements with X
+     * @param targetB array to set elements to Y
+     * @param x     the comparison
+     * @param y     the value to set if the comparison fails
+     */
+    public static void greaterThanXThanSetToYInB(int[] sourceA, double[] targetB, int x, double y) {
+        for (int i=0;i<sourceA.length;i++) {
+            if (sourceA[i] > x)
+                targetB[i] = y;
+        }
+    }
+
+
+    /**
      * Returns the index of the max value in the specified array
      * @param array the array to find the max value index in
      * @return the index of the max value
@@ -1484,6 +1868,24 @@ public class ArrayUtils {
     public static Double[] toBoxed(double[] doubles) {
         return DoubleStream.of(doubles).boxed().collect(Collectors.toList()).toArray(new Double[doubles.length]);
     }
+    
+    /**
+     * Returns a byte array transformed from the specified boolean array.
+     * @param input     the boolean array to transform to a byte array
+     * @return          a byte array
+     */
+    public static byte[] toBytes(boolean[] input) {
+        byte[] toReturn = new byte[input.length / 8];
+        for (int entry = 0; entry < toReturn.length; entry++) {
+            for (int bit = 0; bit < 8; bit++) {
+                if (input[entry * 8 + bit]) {
+                    toReturn[entry] |= (128 >> bit);
+                }
+            }
+        }
+
+        return toReturn;
+    } 
     
     /**
      * Converts an array of Integer objects to an array of its

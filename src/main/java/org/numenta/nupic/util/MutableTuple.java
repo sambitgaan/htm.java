@@ -9,6 +9,13 @@ package org.numenta.nupic.util;
  * @see NamedTuple
  */
 public class MutableTuple extends Tuple {
+    
+    private static final long serialVersionUID = 1L;
+    
+    public MutableTuple(int size) {
+        container = new Object[size];
+    }
+
     /**
      * Constructs a new {@code MutableTuple} with the contents
      * specified. Warning, all Tuples cannot be resized.
@@ -17,16 +24,6 @@ public class MutableTuple extends Tuple {
      */
     public MutableTuple(Object... objects) {
         super(objects);
-    }
-    
-    /**
-     * Convenience constructor to initialize the size of this {@code MutableTuple}
-     * given that it cannot be resized.
-     * 
-     * @param maxFields
-     */
-    public MutableTuple(int maxFields) {
-        this(new Object[maxFields]);
     }
     
     /**
@@ -45,5 +42,6 @@ public class MutableTuple extends Tuple {
      */
     public void clear() {
         for(int i = 0;i < container.length;i++) container[i] = null;
+        container = new Object[0];
     }
 }

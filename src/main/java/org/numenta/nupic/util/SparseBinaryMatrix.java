@@ -25,6 +25,8 @@ package org.numenta.nupic.util;
 import java.lang.reflect.Array;
 import java.util.Arrays;
 
+import org.numenta.nupic.model.Persistable;
+
 /**
  * Implementation of a sparse matrix which contains binary integer
  * values only.
@@ -32,7 +34,10 @@ import java.util.Arrays;
  * @author cogmission
  *
  */
-public class SparseBinaryMatrix extends AbstractSparseBinaryMatrix {
+public class SparseBinaryMatrix extends AbstractSparseBinaryMatrix implements Persistable {
+    /** keep it simple */
+    private static final long serialVersionUID = 1L;
+    
     private Object backingArray;
 
     /**
@@ -104,6 +109,25 @@ public class SparseBinaryMatrix extends AbstractSparseBinaryMatrix {
             int[] slice = (int[])(dimensions.length > 1 ? getSlice(i) : backingArray);
             for(int j = 0;j < slice.length;j++) {
                 results[i] += (inputVector[j] * slice[j]);
+            }
+        }
+    }
+    
+    /**
+     * Fills the specified results array with the result of the 
+     * matrix vector multiplication.
+     * 
+     * @param inputVector       the right side vector
+     * @param results           the results array
+     */
+    public void rightVecSumAtNZ(int[] inputVector, int[] results, double stimulusThreshold) {
+        for(int i = 0;i < dimensions[0];i++) {
+            int[] slice = (int[])(dimensions.length > 1 ? getSlice(i) : backingArray);
+            for(int j = 0;j < slice.length;j++) {
+                results[i] += (inputVector[j] * slice[j]);
+                if(j==slice.length - 1) {
+                    results[i] -= results[i] < stimulusThreshold ? results[i] : 0;
+                }
             }
         }
     }

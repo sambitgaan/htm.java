@@ -24,9 +24,10 @@ package org.numenta.nupic.model;
 
 import java.util.List;
 
-import org.numenta.nupic.Connections;
-
-public class ProximalDendrite extends Segment {
+public class ProximalDendrite extends Segment implements Persistable {
+    /** keep it simple */
+    private static final long serialVersionUID = 1L;
+    
     private Pool pool;
 
     /**
@@ -47,9 +48,9 @@ public class ProximalDendrite extends Segment {
     public Pool createPool(Connections c, int[] inputIndexes) {
         pool = new Pool(inputIndexes.length);
         for(int i = 0;i < inputIndexes.length;i++) {
-            int synCount = c.getSynapseCount();
+            int synCount = c.getProximalSynapseCount();
             pool.setPermanence(c, createSynapse(c, c.getSynapses(this), null, pool, synCount, inputIndexes[i]), 0);
-            c.setSynapseCount(synCount + 1);
+            c.setProximalSynapseCount(synCount + 1);
         }
         return pool;
     }
@@ -118,7 +119,7 @@ public class ProximalDendrite extends Segment {
      * @return
      */
     public int[] getConnectedSynapsesDense(Connections c) {
-        return c.getPotentialPools().get(index).getDenseConnections(c);
+        return c.getPotentialPools().get(index).getDenseConnected(c);
     }
 
     /**
@@ -127,6 +128,6 @@ public class ProximalDendrite extends Segment {
      * @return
      */
     public int[] getConnectedSynapsesSparse(Connections c) {
-        return c.getPotentialPools().get(index).getSparseConnections();
+        return c.getPotentialPools().get(index).getSparsePotential();
     }
 }

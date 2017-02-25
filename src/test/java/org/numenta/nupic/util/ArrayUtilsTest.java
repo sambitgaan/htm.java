@@ -22,19 +22,223 @@
 
 package org.numenta.nupic.util;
 
-import org.junit.Test;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import org.junit.Test;
+import org.numenta.nupic.model.Cell;
+import org.numenta.nupic.model.Column;
 
 public class ArrayUtilsTest {
+    
+    @Test
+    public void testToBytes() {
+        boolean[] ba = { true, true, };
+        byte[] bytes = ArrayUtils.toBytes(ba);
+        assertEquals(0, bytes.length);
+        
+        // 8 positions -> binary 1
+        ba = new boolean[] { false, false, false, false, false, false, false, true };
+        bytes = ArrayUtils.toBytes(ba);
+        assertEquals(1, bytes.length);
+        assertEquals(1, bytes[0]);
+        
+        // 8 positions -> binary 3
+        ba = new boolean[] { false, false, false, false, false, false, true, true };
+        bytes = ArrayUtils.toBytes(ba);
+        assertEquals(1, bytes.length);
+        assertEquals(3, bytes[0]);
+        
+        // 9 positions -> squeezes last bit out
+        ba = new boolean[] { false, false, false, false, false, false, false, true, true };
+        bytes = ArrayUtils.toBytes(ba);
+        assertEquals(1, bytes.length);
+        assertEquals(1, bytes[0]);
+        
+        // 10 positions -> squeeze last to bits out
+        ba = new boolean[] { false, false, false, false, false, false, false, false, true, true };
+        bytes = ArrayUtils.toBytes(ba);
+        assertEquals(1, bytes.length);
+        assertEquals(0, bytes[0]);
+        
+        // 16 positions -> enough for two bytes, array length increases to 2
+        ba = new boolean[] { false, false, false, false, false, false, false, false, false, false, false, false, false, false, true, true };
+        bytes = ArrayUtils.toBytes(ba);
+        assertEquals(2, bytes.length);
+        assertEquals(0, bytes[0]);
+        assertEquals(3, bytes[1]);
+    }
+    
+    @Test
+    public void testSubst() {
+        int[] original = new int[] { 30, 30, 30, 30, 30 };
+        int[] substitutes = new int[] { 0, 1, 2, 3, 4 };
+        int[] substInds = new int[] { 4, 1, 3 };
+        
+        int[] expected = { 30, 1, 30, 3, 4 };
+        
+        assertTrue(Arrays.equals(expected, ArrayUtils.subst(original, substitutes, substInds)));
+    }
+    
+    @Test
+    public void testMaxIndex() {
+        int max = ArrayUtils.maxIndex(new int[] { 2, 4, 5 });
+        assertEquals(39, max);
+    }
+    
+    @Test
+    public void testToCoordinates() {
+        int[] coords = ArrayUtils.toCoordinates(19, new int[] { 2, 4, 5 }, false);
+        assertTrue(Arrays.equals(new int[] { 0, 3, 4 }, coords));
+        
+        coords = ArrayUtils.toCoordinates(19, new int[] { 2, 4, 5 }, true);
+        assertTrue(Arrays.equals(new int[] { 4, 3, 0 }, coords));
+    }
+    
+    @Test
+    public void testArgsort() {
+        int[] args = ArrayUtils.argsort(new int[] { 11, 2, 3, 7, 0 });
+        assertTrue(Arrays.equals(new int[] {4, 1, 2, 3, 0}, args));
+        
+        args = ArrayUtils.argsort(new int[] { 11, 2, 3, 7, 0 }, -1, -1);
+        assertTrue(Arrays.equals(new int[] {4, 1, 2, 3, 0}, args));
+        
+        args = ArrayUtils.argsort(new int[] { 11, 2, 3, 7, 0 }, 0, 3);
+        assertTrue(Arrays.equals(new int[] {4, 1, 2}, args));
+    }
+    
+    @Test
+    public void testShape() {
+        int[][] inputPattern = { { 2, 3, 4, 5 }, { 6, 7, 8, 9} };
+        int[] shape = ArrayUtils.shape(inputPattern);
+        assertTrue(Arrays.equals(new int[] { 2, 4 }, shape));
+    }
+    
+    @Test 
+    public void testReshape() {
+        int[][] test = {
+            { 0, 1, 2, 3, 4, 5 },
+            { 6, 7, 8, 9, 10, 11 }
+        };
+        
+        int[][] expected = {
+            { 0, 1, 2 },
+            { 3, 4, 5 },
+            { 6, 7, 8 },
+            { 9, 10, 11 }
+        };
+        
+        int[][] result = ArrayUtils.reshape(test, 3);
+        for(int i = 0;i < result.length;i++) {
+            for(int j = 0;j < result[i].length;j++) {
+                assertEquals(expected[i][j], result[i][j]);
+            }
+        }
+        
+        // Unhappy case
+        try {
+            ArrayUtils.reshape(test, 5);
+        }catch(Exception e) {
+            assertTrue(e instanceof IllegalArgumentException);
+            assertEquals("12 is not evenly divisible by 5", e.getMessage());
+        }
+        
+        // Test zero-length case
+        int[] result4 = ArrayUtils.unravel(new int[0][]);
+        assertNotNull(result4);
+        assertTrue(result4.length == 0);
+    }
+    
+    @Test
+    public void testRavelAndUnRavel() {
+        int[] test = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
+        int[][] expected = {
+            { 0, 1, 2, 3, 4, 5 },
+            { 6, 7, 8, 9, 10, 11 }
+        };
+        
+        int[][] result = ArrayUtils.ravel(test, 6);
+        for(int i = 0;i < result.length;i++) {
+            for(int j = 0;j < result[i].length;j++) {
+                assertEquals(expected[i][j], result[i][j]);
+            }
+        }
+        
+        int[] result2 = ArrayUtils.unravel(result);
+        for(int i = 0;i < result2.length;i++) {
+            assertEquals(test[i], result2[i]);
+        }
+        
+        // Unhappy case
+        try {
+            ArrayUtils.ravel(test, 5);
+        }catch(Exception e) {
+            assertTrue(e instanceof IllegalArgumentException);
+            assertEquals("12 is not evenly divisible by 5", e.getMessage());
+        }
+        
+        // Test zero-length case
+        int[] result4 = ArrayUtils.unravel(new int[0][]);
+        assertNotNull(result4);
+        assertTrue(result4.length == 0);
+    }
+    
+    @Test
+    public void testRotateRight() {
+        int[][] test = new int[][] {
+            { 1, 0, 1, 0 },
+            { 1, 0, 1, 0 },
+            { 1, 0, 1, 0 },
+            { 1, 0, 1, 0 }
+        };
+        
+        int[][] expected = new int[][] {
+            { 1, 1, 1, 1 },
+            { 0, 0, 0, 0 },
+            { 1, 1, 1, 1 },
+            { 0, 0, 0, 0 }            
+        };
+        
+        int[][] result = ArrayUtils.rotateRight(test);
+        for(int i = 0;i < result.length;i++) {
+            for(int j = 0;j < result[i].length;j++) {
+                assertEquals(result[i][j], expected[i][j]);
+            }
+        }
+    }
+    
+    @Test
+    public void testRotateLeft() {
+        int[][] test = new int[][] {
+            { 1, 0, 1, 0 },
+            { 1, 0, 1, 0 },
+            { 1, 0, 1, 0 },
+            { 1, 0, 1, 0 }
+        };
+        
+        int[][] expected = new int[][] {
+            { 0, 0, 0, 0 },
+            { 1, 1, 1, 1 },
+            { 0, 0, 0, 0 },
+            { 1, 1, 1, 1 }
+        };
+        
+        int[][] result = ArrayUtils.rotateLeft(test);
+        for(int i = 0;i < result.length;i++) {
+            for(int j = 0;j < result[i].length;j++) {
+                assertEquals(result[i][j], expected[i][j]);
+            }
+        }
+    }
     
     @Test
     public void testConcat() {
@@ -185,6 +389,106 @@ public class ArrayUtilsTest {
         // Test none in both
         assertTrue(Arrays.equals(expected, ArrayUtils.in1d(expected, expected)));
     }
+    
+    @Test
+    public void testTo1d() {
+        double[][] da = new double[][] { { 1., 1.}, {2., 2.}};
+        double[] expected = new double[] { 1., 1., 2., 2. };
+        assertTrue(Arrays.equals(expected, ArrayUtils.to1D(da)));
+        
+        int[][] ia = new int[][] { { 1, 1 }, { 2, 2 } };
+        int[] expectedia = new int[] { 1, 1, 2, 2 };
+        assertTrue(Arrays.equals(expectedia, ArrayUtils.to1D(ia)));
+    }
+    
+    @Test
+    public void testZip_ArrayOfLists() {
+        Cell cell0 = new Cell(new Column(1, 0), 0);
+        Cell cell1 = new Cell(new Column(1, 1), 1);
+        List<?> o1 = Arrays.asList(new Cell[] { cell0, cell1 });
+        List<?> o2 = Arrays.asList(new Integer[] { new Integer(1), new Integer(2) });
+        List<?> o3 = Arrays.asList(new Double[] { 2.3, 4.5 });
+        
+        List<Tuple> zipped = ArrayUtils.zip(o1, o2, o3);
+        assertEquals(2, zipped.size());
+        assertTrue(zipped.get(0).get(0) instanceof Cell && zipped.get(0).get(1) instanceof Integer);
+        assertTrue(zipped.get(0).get(0).equals(cell0) && zipped.get(0).get(1).equals(new Integer(1)) && zipped.get(0).get(2).equals(new Double(2.3)));
+        assertTrue(zipped.get(1).get(0).equals(cell1) && zipped.get(1).get(1).equals(new Integer(2)) && zipped.get(1).get(2).equals(new Double(4.5)));
+        
+        // Negative tests
+        assertFalse(zipped.get(0).get(0).equals(cell0) && zipped.get(0).get(1).equals(new Integer(2))); // Bad Integer
+        assertFalse(zipped.get(1).get(0).equals(cell0) && zipped.get(1).get(1).equals(new Integer(2))); // Bad Cell
+    }
+    
+    @Test
+    public void testZip_ArrayOfIntArrays() {
+        int[] o1 = { 3, 4 };
+        int[] o2 = { 5, 5 };
+        int[] o3 = { -1, 7 };
+        
+        List<Tuple> zipped = ArrayUtils.zip(o1, o2, o3);
+        assertEquals(2, zipped.size());
+        assertTrue(Arrays.equals((int[])zipped.get(0).all().stream().mapToInt(i -> (int)i).toArray(), new int[] { 3, 5, -1 }));
+        assertTrue(Arrays.equals((int[])zipped.get(1).all().stream().mapToInt(i -> (int)i).toArray(), new int[] { 4, 5, 7 }));
+    }
+    
+    @Test
+    public void testZip() {
+        Cell cell0 = new Cell(new Column(1, 0), 0);
+        Cell cell1 = new Cell(new Column(1, 1), 1);
+        Object[] o1 = new Object[] { cell0, cell1 };
+        Object[] o2 = new Object[] { new Integer(1), new Integer(2) };
+        
+        List<Tuple> zipped = ArrayUtils.zip(o1, o2);
+        assertEquals(2, zipped.size());
+        assertTrue(zipped.get(0).get(0) instanceof Cell && zipped.get(0).get(1) instanceof Integer);
+        assertTrue(zipped.get(0).get(0).equals(cell0) && zipped.get(0).get(1).equals(new Integer(1)));
+        assertTrue(zipped.get(1).get(0).equals(cell1) && zipped.get(1).get(1).equals(new Integer(2)));
+        
+        // Negative tests
+        assertFalse(zipped.get(0).get(0).equals(cell0) && zipped.get(0).get(1).equals(new Integer(2))); // Bad Integer
+        assertFalse(zipped.get(1).get(0).equals(cell0) && zipped.get(1).get(1).equals(new Integer(2))); // Bad Cell
+    }
+    
+    @Test
+    public void testMaximum() {
+        double value = 6.7;
+        double[] input = new double[] { 3.2, 6.8 };
+        double[] expected = new double[] { 6.7, 6.8 };
+        
+        double[] result = ArrayUtils.maximum(input, value);
+        assertTrue(Arrays.equals(expected, result));
+    }
+    
+    @Test
+    public void testRoundDivide() {
+        assertEquals(2.35, 4.7 / 2, 0.01);
+        assertEquals(2.45, 4.9 / 2, 0.01);
+        assertEquals(2.70, 5.4 / 2, 0.01);
+        
+        double[] inputDividend = new double[] { 4.7, 4.9, 5.4 };
+        double[] inputDivisor = new double[] { 2., 2., 2. };
+        
+        double[] expected0 = new double[] { 2.4, 2.5, 2.7 };
+        double[] expected1 = new double[] { 2.0, 2.0, 3.0 };
+        
+        double[] result = ArrayUtils.roundDivide(inputDividend, inputDivisor, 2);
+        assertTrue(Arrays.equals(expected0, result));
+        
+        double[] result2 = ArrayUtils.roundDivide(inputDividend, inputDivisor, 1);
+        assertTrue(Arrays.equals(expected1, result2));
+    }
+    
+    @Test
+    public void testSubtract() {
+        // minuend - subtrahend = difference
+        List<Integer> minuend = Arrays.asList(new Integer[] { 2, 2, 2 });
+        List<Integer> subtrahend = Arrays.asList(new Integer[] { 0, 1, 2 });
+        List<Integer> difference = Arrays.asList(new Integer[] { 2, 1, 0 });
+        
+        List<Integer> result = ArrayUtils.subtract(subtrahend, minuend);
+        assertEquals(difference, result);
+    }
 
     @Test
     public void testRecursiveCoordinatesAssemble() throws InterruptedException {
@@ -329,4 +633,32 @@ public class ArrayUtilsTest {
 	    double[] overlaps = new double[] { 1, 2, 1, 4, 8, 3, 12, 5, 4, 1 };
 	    assertTrue(Arrays.equals(new int[] { 6, 4, 7 }, ArrayUtils.nGreatest(overlaps, 3)));
 	}
+
+    @Test
+    public void testGreaterThanXFunctions() {
+        int[] overlaps = new int[] { 0, 1, 0, 0, 3, 0, 6, 7, 1, 2, 0};
+        double[] overlapArray = new double[overlaps.length];
+        ArrayUtils.greaterThanXThanSetToYInB(overlaps, overlapArray, 0, 1);
+        assertArrayEquals(new double[] {  0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 0 }, overlapArray, 0.0001);
+
+        int[] arrayInt = new int[] { 0, 1, 0, 0, 3, 0, 6, 7, 1, 2, 0};
+        ArrayUtils.greaterThanXThanSetToY(arrayInt, 0, 1);
+        assertArrayEquals(new int[] { 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 0}, arrayInt);
+
+        double[] arrayDouble = new double[] { 0, 5, 3, 0, 2, 0, 0, 7, 1, 2, 0};
+        ArrayUtils.greaterThanXThanSetToY(arrayDouble, 0, 2);
+        assertArrayEquals(new double[] { 0, 2, 2, 0, 2, 0, 0, 2, 2, 2, 0}, arrayDouble, 0.0001);
+    }
+
+
+    @Test
+    public void testArgmax()
+    {
+        int[] iarray = new int[] { 0, 1, 0, 0, 3, 0, 6, 7, 1, 2, 0};
+        double[] darray = new double[] { 0, 1, 10, 0, 3, 0, 6, 7, 1, 2, 0};
+        assertEquals(ArrayUtils.argmax(iarray), 7 );
+        assertEquals(ArrayUtils.argmax(darray), 2 );
+    }
+
+
 }

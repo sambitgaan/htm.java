@@ -27,7 +27,7 @@ public class AnomalyTest {
     @Test
     public void testComputeRawAnomalyScoreNoActive() {
         double score = Anomaly.computeRawAnomalyScore(new int[0], new int[] { 3, 5 });
-        assertEquals(score, 1.0, 0.00001);
+        assertEquals(score, 0.0, 0.00001);
     }
     
     @Test
@@ -45,7 +45,6 @@ public class AnomalyTest {
     @Test
     public void testComputeRawAnomalyPartialNoMatch() {
         double score = Anomaly.computeRawAnomalyScore(new int[] { 2, 3, 6 }, new int[] { 3, 5, 7 });
-        System.out.println((2.0 / 3.0));
         assertEquals(score, 2.0 / 3.0, 0.001);
     }
 
@@ -66,7 +65,7 @@ public class AnomalyTest {
         params.put(KEY_MODE, Mode.PURE);
         Anomaly anomalyComputer = Anomaly.create(params);
         double score = anomalyComputer.compute(new int[0], new int[] {3,5}, 0, 0);
-        assertEquals(1.0, score, 0);
+        assertEquals(0.0, score, 0);
     }
     
     @Test

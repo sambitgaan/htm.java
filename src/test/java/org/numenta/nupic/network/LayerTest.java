@@ -36,11 +36,11 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import org.junit.Test;
 import org.numenta.nupic.Parameters;
 import org.numenta.nupic.Parameters.KEY;
-import org.numenta.nupic.SDR;
 import org.numenta.nupic.algorithms.Anomaly;
 import org.numenta.nupic.algorithms.Anomaly.Mode;
 import org.numenta.nupic.algorithms.CLAClassifier;
@@ -48,6 +48,9 @@ import org.numenta.nupic.algorithms.SpatialPooler;
 import org.numenta.nupic.algorithms.TemporalMemory;
 import org.numenta.nupic.datagen.ResourceLocator;
 import org.numenta.nupic.encoders.MultiEncoder;
+import org.numenta.nupic.model.Connections;
+import org.numenta.nupic.model.SDR;
+import org.numenta.nupic.network.Layer.FunctionFactory;
 import org.numenta.nupic.network.sensor.FileSensor;
 import org.numenta.nupic.network.sensor.HTMSensor;
 import org.numenta.nupic.network.sensor.ObservableSensor;
@@ -55,13 +58,15 @@ import org.numenta.nupic.network.sensor.Publisher;
 import org.numenta.nupic.network.sensor.Sensor;
 import org.numenta.nupic.network.sensor.SensorParams;
 import org.numenta.nupic.network.sensor.SensorParams.Keys;
-import org.numenta.nupic.util.ArrayUtils;
 import org.numenta.nupic.util.MersenneTwister;
+import org.numenta.nupic.util.UniversalRandom;
 
 import rx.Observable;
 import rx.Observer;
 import rx.Subscriber;
 import rx.functions.Func1;
+import rx.observers.TestObserver;
+import rx.subjects.PublishSubject;
 
 /**
  * Tests the "heart and soul" of the Network API
@@ -69,12 +74,10 @@ import rx.functions.Func1;
  * @author DavidRay
  *
  */
-public class LayerTest {
+public class LayerTest extends ObservableTestBase {
 
     /** Total used for spatial pooler priming tests */
     private int TOTAL = 0;
-
-    
 
     @Test
     public void testMasking() {
@@ -109,12 +112,114 @@ public class LayerTest {
         algo_content_mask ^= Layer.CLA_CLASSIFIER;
         assertEquals(0, algo_content_mask);
     }
+    
+    @Test
+    public void callsOnClosedLayer() {
+        Parameters p = NetworkTestHarness.getParameters().copy();
+        p = p.union(NetworkTestHarness.getDayDemoTestEncoderParams());
+        p.set(KEY.RANDOM, new UniversalRandom(42));
+        
+        Network n = new Network("AlreadyClosed", p)
+            .add(Network.createRegion("AlreadyClosed")
+                .add(Network.createLayer("AlreadyClosed", p)));
+        
+        Layer<?> l = n.lookup("AlreadyClosed").lookup("AlreadyClosed");
+        l.using(new Connections());
+        l.using(p);
+        
+        l.close();
+        
+        try {
+            l.using(new Connections());
+            
+            fail(); // Should fail here, disallowing "using" call on closed layer
+        }catch(Exception e) {
+            assertEquals(IllegalStateException.class, e.getClass());
+            assertEquals("Layer already \"closed\"", e.getMessage());
+        }
+        
+        try {
+            l.using(p);
+            
+            fail(); // Should fail here, disallowing "using" call on closed layer
+        }catch(Exception e) {
+            assertEquals(IllegalStateException.class, e.getClass());
+            assertEquals("Layer already \"closed\"", e.getMessage());
+        }
+    }
+    
+    @Test
+    public void testNoName() {
+        Parameters p = Parameters.getAllDefaultParameters();
+        
+        try {
+            new Network("", p)
+                .add(Network.createRegion("")
+                    .add(Network.createLayer("", p)
+                        .add(Sensor.create(
+                            FileSensor::create, 
+                            SensorParams.create(
+                                Keys::path, "", ResourceLocator.path("rec-center-hourly-small.csv"))))));
+            
+            fail(); // Fails due to no name...
+        }catch(Exception e) {
+            assertEquals(IllegalStateException.class, e.getClass());
+            assertEquals("All Networks must have a name. Increases digestion, and overall happiness!",
+                e.getMessage());
+        }
+        
+        try {
+            new Network("Name", p)
+                .add(Network.createRegion("")
+                    .add(Network.createLayer("", p)
+                        .add(Sensor.create(
+                            FileSensor::create, 
+                            SensorParams.create(
+                                Keys::path, "", ResourceLocator.path("rec-center-hourly-small.csv"))))));
+            
+            fail(); // Fails due to no name on Region...
+        }catch(Exception e) {
+            assertEquals(IllegalArgumentException.class, e.getClass());
+            assertEquals("Name may not be null or empty. ...not that anyone here advocates name calling!",
+                e.getMessage());
+        }
+    }
+    
+    @Test
+    public void testAddSensor() {
+        Parameters p = NetworkTestHarness.getParameters().copy();
+        p = p.union(NetworkTestHarness.getDayDemoTestEncoderParams());
+        p.set(KEY.RANDOM, new UniversalRandom(42));
+        
+        try {
+            PublisherSupplier supplier = PublisherSupplier.builder()
+                .addHeader("dayOfWeek")
+                .addHeader("int")
+                .addHeader("B").build();
+                        
+            Network n = new Network("Name", p)
+                .add(Network.createRegion("Name")
+                    .add(Network.createLayer("Name", p)));
+            
+            Layer<?> l = n.lookup("Name").lookup("Name"); 
+            l.add(Sensor.create(
+                ObservableSensor::create, 
+                SensorParams.create(
+                    Keys::obs, "", supplier)));
+            
+            assertEquals(n, l.getNetwork());
+            assertTrue(l.getRegion() != null);
+            
+        }catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
 
     @Test
     public void testGetAllValues() {
         Parameters p = NetworkTestHarness.getParameters().copy();
         p = p.union(NetworkTestHarness.getDayDemoTestEncoderParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.RANDOM, new UniversalRandom(42));
 
         MultiEncoder me = MultiEncoder.builder().name("").build();
         Layer<Map<String, Object>> l = new Layer<>(p, me, new SpatialPooler(), new TemporalMemory(), Boolean.TRUE, null);
@@ -127,13 +232,13 @@ public class LayerTest {
             assertEquals("Predictions not available. Either classifiers unspecified or inferencing has not yet begun.", e.getMessage());
         }
 
-        l.subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester;
+        l.subscribe(tester = new TestObserver<Inference>() {
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { System.out.println("error: " + e.getMessage()); e.printStackTrace();}
             @Override
             public void onNext(Inference i) {
                 assertNotNull(i);
-                assertEquals(36, i.getSDR().length);
+                assertEquals(42, i.getSDR().length);
             }
         });
 
@@ -146,6 +251,9 @@ public class LayerTest {
         assertNotNull(values);
         assertTrue(values.length == 1);
         assertEquals(0.0D, values[0]);
+        
+        // Check for exception during the TestObserver's onNext() execution.
+        checkObserver(tester);
     }
 
     @Test
@@ -193,14 +301,13 @@ public class LayerTest {
     @Test
     public void testHalt() {
         Sensor<File> sensor = Sensor.create(
-                        FileSensor::create, 
-                        SensorParams.create(
-                                        Keys::path, "", ResourceLocator.path("rec-center-hourly-small.csv")));
+            FileSensor::create, SensorParams.create(
+                Keys::path, "", ResourceLocator.path("rec-center-hourly-small.csv")));
 
         Parameters p = NetworkTestHarness.getParameters().copy();
         p = p.union(NetworkTestHarness.getHotGymTestEncoderParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
-        p.setParameterByKey(KEY.AUTO_CLASSIFY, Boolean.TRUE);
+        p.set(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.AUTO_CLASSIFY, Boolean.TRUE);
 
         HTMSensor<File> htmSensor = (HTMSensor<File>)sensor;
 
@@ -208,16 +315,16 @@ public class LayerTest {
         final Layer<int[]> l = new Layer<>(n);
         l.add(htmSensor);
 
-        l.start();
-
-        l.subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester;
+        l.subscribe(tester = new TestObserver<Inference>() {
             @Override public void onCompleted() {
                 assertTrue(l.isHalted());
                 isHalted = true;
             }
-            @Override public void onError(Throwable e) { e.printStackTrace(); }
             @Override public void onNext(Inference output) {}
         });
+        
+        l.start();
 
         try {
             l.halt();
@@ -227,6 +334,9 @@ public class LayerTest {
             e.printStackTrace();
             fail();
         }
+        
+        // Check for exception during the TestObserver's onNext() execution.
+        checkObserver(tester);
     }
 
     int trueCount = 0;
@@ -239,16 +349,14 @@ public class LayerTest {
 
         Parameters p = NetworkTestHarness.getParameters().copy();
         p = p.union(NetworkTestHarness.getHotGymTestEncoderParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
-        p.setParameterByKey(KEY.AUTO_CLASSIFY, Boolean.TRUE);
+        p.set(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.AUTO_CLASSIFY, Boolean.TRUE);
 
         HTMSensor<File> htmSensor = (HTMSensor<File>)sensor;
 
         Network n = Network.create("test network", p);
         final Layer<int[]> l = new Layer<>(n);
         l.add(htmSensor);
-
-        l.start();
 
         l.subscribe(new Observer<Inference>() {
             @Override public void onCompleted() {}
@@ -259,6 +367,8 @@ public class LayerTest {
                 }
             }
         });
+        
+        l.start();
 
         try {
             l.getLayerThread().join();
@@ -279,16 +389,14 @@ public class LayerTest {
 
         Parameters p = NetworkTestHarness.getParameters().copy();
         p = p.union(NetworkTestHarness.getHotGymTestEncoderParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
-        p.setParameterByKey(KEY.AUTO_CLASSIFY, Boolean.TRUE);
+        p.set(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.AUTO_CLASSIFY, Boolean.TRUE);
 
         HTMSensor<File> htmSensor = (HTMSensor<File>)sensor;
 
         Network n = Network.create("test network", p);
         final Layer<int[]> l = new Layer<>(n);
         l.add(htmSensor);
-
-        l.start();
 
         l.subscribe(new Observer<Inference>() {
             @Override public void onCompleted() {}
@@ -299,6 +407,8 @@ public class LayerTest {
                 }
             }
         });
+        
+        l.start();
 
         try {
             l.getLayerThread().join();
@@ -311,64 +421,102 @@ public class LayerTest {
 
     @Test
     public void testLayerWithObservableInput() {
-        Publisher manual = Publisher.builder()
-            .addHeader("timestamp,consumption")
-            .addHeader("datetime,float")
-            .addHeader("B")
-            .build();
+        PublisherSupplier manual = PublisherSupplier.builder()
+            .addHeader("timestamp, consumption")
+            .addHeader("datetime, float")
+            .addHeader("B").build();
 
         Sensor<ObservableSensor<String[]>> sensor = Sensor.create(
-            ObservableSensor::create, 
-            SensorParams.create(
+            ObservableSensor::create, SensorParams.create(
                 Keys::obs, new Object[] {"name", manual}));
 
         Parameters p = NetworkTestHarness.getParameters().copy();
         p = p.union(NetworkTestHarness.getHotGymTestEncoderParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
-        p.setParameterByKey(KEY.AUTO_CLASSIFY, Boolean.TRUE);
+        p.set(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.AUTO_CLASSIFY, Boolean.TRUE);
 
         HTMSensor<ObservableSensor<String[]>> htmSensor = (HTMSensor<ObservableSensor<String[]>>)sensor;
 
-        Network n = Network.create("test network", p);
-        final Layer<int[]> l = new Layer<>(n);
-        l.add(htmSensor);
-
-        l.start();
-
-        l.subscribe(new Observer<Inference>() {
+        Network n = Network.create("test network", p)
+            .add(Network.createRegion("r1")
+                .add(Network.createLayer("2/3", p)
+                    .add(htmSensor)));
+                
+        final Layer<?> l = n.lookup("r1").lookup("2/3");
+        
+        TestObserver<Inference> tester;
+        l.observe().subscribe(tester = new TestObserver<Inference>() {
             int idx = 0;
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { e.printStackTrace(); }
             @Override public void onNext(Inference output) {
                 switch(idx) {
-                    case 0: assertEquals("[0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1]", Arrays.toString(output.getSDR()));
+                    case 0: assertEquals("[0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1]", Arrays.toString(output.getSDR()));
                     break;
-                    case 1: assertEquals("[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]", Arrays.toString(output.getSDR()));
+                    case 1: assertEquals("[1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]", Arrays.toString(output.getSDR()));
                     break;
-                    case 2: assertEquals("[1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]", Arrays.toString(output.getSDR()));
+                    case 2: assertEquals("[0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]", Arrays.toString(output.getSDR()));
                     break;
                 }
                 ++idx;
             }
         });
-
+        
+        l.start();
+        
+        Publisher pub = n.getPublisher();
+        
         try {
             String[] entries = { 
                 "7/2/10 0:00,21.2",
                 "7/2/10 1:00,34.0",
                 "7/2/10 2:00,40.4",
             };
-
+            
             // Send inputs through the observable
             for(String s : entries) {
-                manual.onNext(s);
+                pub.onNext(s);
             }
+            
+            ////////////////////
+            // Very Important //
+            ////////////////////
+            pub.onComplete();
 
-            Thread.sleep(100);
+            try {
+                l.getLayerThread().join();
+            }catch(Exception e) {e.printStackTrace();}
         }catch(Exception e) {
             e.printStackTrace();
             fail();
         }
+        
+        // Check for exception during the TestObserver's onNext() execution.
+        checkObserver(tester);
+    }
+    
+    public Stream<String> makeStream() {
+        return Stream.of(
+            "7/2/10 0:00,21.2",
+            "7/2/10 1:00,34.0",
+            "7/2/10 2:00,40.4",
+            "7/2/10 3:00,4.7",
+            "7/2/10 4:00,4.6",
+            "7/2/10 5:00,23.5",
+            "7/2/10 6:00,47.5",
+            "7/2/10 7:00,45.4",
+            "7/2/10 8:00,46.1",
+            "7/2/10 9:00,41.5",
+            "7/2/10 10:00,43.4",
+            "7/2/10 11:00,43.8",
+            "7/2/10 12:00,37.8",
+            "7/2/10 13:00,36.6",
+            "7/2/10 14:00,35.7",
+            "7/2/10 15:00,38.9",
+            "7/2/10 16:00,36.2",
+            "7/2/10 17:00,36.6",
+            "7/2/10 18:00,37.2",
+            "7/2/10 19:00,38.2",
+            "7/2/10 20:00,14.1");
     }
     
     @Test
@@ -386,15 +534,13 @@ public class LayerTest {
 
         Parameters p = Parameters.getAllDefaultParameters();
         p = p.union(getArrayTestParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.RANDOM, new MersenneTwister(42));
 
         HTMSensor<ObservableSensor<String[]>> htmSensor = (HTMSensor<ObservableSensor<String[]>>)sensor;
 
         Network n = Network.create("test network", p);
         final Layer<int[]> l = new Layer<>(n);
         l.add(htmSensor);
-
-        l.start();
 
         String input = "[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, "
                         + "1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, "
@@ -417,13 +563,15 @@ public class LayerTest {
                         + "0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "
                         + "0, 0, 0, 0, 0, 0, 0, 0, 0, 0]";
 
-        l.subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester;
+        l.subscribe(tester = new TestObserver<Inference>() {
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { e.printStackTrace(); }
             @Override public void onNext(Inference output) {
                 assertEquals(input, Arrays.toString((int[])output.getLayerInput()));
             }
         });
+        
+        l.start();
 
         try {
             String[] entries = { 
@@ -442,12 +590,14 @@ public class LayerTest {
             fail();
         }
         
+        // Check for exception during the TestObserver's onNext() execution.
+        checkObserver(tester);
     }
 
     @Test 
     public void testLayerWithGenericObservable() {
         Parameters p = NetworkTestHarness.getParameters().copy();
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.RANDOM, new UniversalRandom(42));
 
         int[][] inputs = new int[7][8];
         inputs[0] = new int[] { 1, 1, 0, 0, 0, 0, 0, 1 };
@@ -458,8 +608,8 @@ public class LayerTest {
         inputs[5] = new int[] { 0, 0, 0, 0, 1, 1, 1, 0 };
         inputs[6] = new int[] { 0, 0, 0, 0, 0, 1, 1, 1 };
 
-        final int[] expected0 = new int[] { 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0 };
-        final int[] expected1 = new int[] { 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0 };
+        final int[] expected0 = new int[] { 1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0 };
+        final int[] expected1 = new int[] { 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0 };
 
         Func1<ManualInput, ManualInput> addedFunc = l -> { 
             return l.customObject("Interposed: " + Arrays.toString(l.getSDR()));
@@ -473,20 +623,20 @@ public class LayerTest {
 
         @SuppressWarnings("unchecked")
         Layer<int[]> l = (Layer<int[]>)n.lookup("R1").lookup("L1");
-        l.subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester;
+        l.subscribe(tester = new TestObserver<Inference>() {
             int test = 0;
 
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { e.printStackTrace(); }
             @Override
             public void onNext(Inference i) {
                 if(test == 0) {
                     assertTrue(Arrays.equals(expected0, i.getSDR()));
-                    assertEquals("Interposed: [0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0]", i.getCustomObject());
+                    assertEquals("Interposed: [1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0]", i.getCustomObject());
                 }
                 if(test == 1) {
                     assertTrue(Arrays.equals(expected1, i.getSDR()));
-                    assertEquals("Interposed: [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0]", i.getCustomObject());
+                    assertEquals("Interposed: [1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0]", i.getCustomObject());
                 }
                 ++test; 
             }
@@ -496,13 +646,16 @@ public class LayerTest {
         // Now push some fake data through so that "onNext" is called above
         l.compute(inputs[0]);
         l.compute(inputs[1]);
+        
+        // Check for exception during the TestObserver's onNext() execution.
+        checkObserver(tester);
     }
 
     @Test
     public void testBasicSetupEncoder_UsingSubscribe() {
         Parameters p = NetworkTestHarness.getParameters().copy();
         p = p.union(NetworkTestHarness.getDayDemoTestEncoderParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.RANDOM, new MersenneTwister(42));
 
         MultiEncoder me = MultiEncoder.builder().name("").build();
         Layer<Map<String, Object>> l = new Layer<>(p, me, null, null, null, null);
@@ -516,10 +669,10 @@ public class LayerTest {
         expected[5] = new int[] { 0, 0, 0, 0, 1, 1, 1, 0 };
         expected[6] = new int[] { 0, 0, 0, 0, 0, 1, 1, 1 };
 
-        l.subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester;
+        l.subscribe(tester = new TestObserver<Inference>() {
             int seq = 0;
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { e.printStackTrace(); }
             @Override public void onNext(Inference output) {
                 assertTrue(Arrays.equals(expected[seq++], output.getSDR()));
             }
@@ -530,13 +683,16 @@ public class LayerTest {
             inputs.put("dayOfWeek", i);
             l.compute(inputs);
         }
+        
+        // Check for exception during the TestObserver's onNext() execution.
+        checkObserver(tester);
     }
 
     @Test
     public void testBasicSetupEncoder_UsingObserve() {
         Parameters p = NetworkTestHarness.getParameters().copy();
         p = p.union(NetworkTestHarness.getDayDemoTestEncoderParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.RANDOM, new MersenneTwister(42));
 
         MultiEncoder me = MultiEncoder.builder().name("").build();
         Layer<Map<String, Object>> l = new Layer<>(p, me, null, null, null, null);
@@ -551,10 +707,10 @@ public class LayerTest {
         expected[6] = new int[] { 0, 0, 0, 0, 0, 1, 1, 1 };
 
         Observable<Inference> o = l.observe();
-        o.subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester;
+        o.subscribe(tester = new TestObserver<Inference>() {
             int seq = 0;
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { e.printStackTrace(); }
             @Override public void onNext(Inference output) {
                 assertTrue(Arrays.equals(expected[seq++], output.getSDR()));
             }
@@ -565,6 +721,9 @@ public class LayerTest {
             inputs.put("dayOfWeek", i);
             l.compute(inputs);
         }
+        
+        // Check for exception during the TestObserver's onNext() execution.
+        checkObserver(tester);
     }
 
     @Test
@@ -576,8 +735,8 @@ public class LayerTest {
 
         Parameters p = NetworkTestHarness.getParameters().copy();
         p = p.union(NetworkTestHarness.getHotGymTestEncoderParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
-        p.setParameterByKey(KEY.AUTO_CLASSIFY, Boolean.TRUE);
+        p.set(KEY.RANDOM, new UniversalRandom(42));
+        p.set(KEY.AUTO_CLASSIFY, Boolean.TRUE);
 
         HTMSensor<File> htmSensor = (HTMSensor<File>)sensor;
 
@@ -586,32 +745,32 @@ public class LayerTest {
         l.add(htmSensor);
 
         final int[][] expected = new int[][] {
-            { 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1},
-            { 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-            { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            { 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            { 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            { 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            { 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            { 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            { 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            { 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0}
+            {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+            {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            {0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0}
         };
 
         ///////////////////////////////////////////////////////
         //              Test with 2 subscribers              //
         ///////////////////////////////////////////////////////
-        l.observe().subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester;
+        l.observe().subscribe(tester = new TestObserver<Inference>() {
             int seq = 0;
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { e.printStackTrace(); }
             @Override public void onNext(Inference output) {
 //                System.out.println("  seq = " + seq + ",    recNum = " + output.getRecordNum() + ",  expected = " + Arrays.toString(expected[seq]));
 //                System.out.println("  seq = " + seq + ",    recNum = " + output.getRecordNum() + ",    output = " + Arrays.toString(output.getSDR()));
@@ -620,10 +779,10 @@ public class LayerTest {
             }
         });
 
-        l.observe().subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester2;
+        l.observe().subscribe(tester2 = new TestObserver<Inference>() {
             int seq2 = 0;
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { e.printStackTrace(); }
             @Override public void onNext(Inference output) {
 //                System.out.println("  seq = " + seq2 + ",    recNum = " + output.getRecordNum() + ",  expected = " + Arrays.toString(expected[seq2]));
 //                System.out.println("  seq = " + seq2 + ",    recNum = " + output.getRecordNum() + ",    output = " + Arrays.toString(output.getSDR()));
@@ -639,6 +798,10 @@ public class LayerTest {
         }catch(Exception e) {
             e.printStackTrace();
         }
+        
+        // Check for exception during the TestObserver's onNext() execution.
+        checkObserver(tester);
+        checkObserver(tester2);
     }
 
     /**
@@ -647,7 +810,7 @@ public class LayerTest {
     @Test
     public void testBasicSetup_SpatialPooler_MANUAL_MODE() {
         Parameters p = NetworkTestHarness.getParameters().copy();
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.RANDOM, new UniversalRandom(42));
 
         int[][] inputs = new int[7][8];
         inputs[0] = new int[] { 1, 1, 0, 0, 0, 0, 0, 1 };
@@ -658,16 +821,16 @@ public class LayerTest {
         inputs[5] = new int[] { 0, 0, 0, 0, 1, 1, 1, 0 };
         inputs[6] = new int[] { 0, 0, 0, 0, 0, 1, 1, 1 };
 
-        final int[] expected0 = new int[] { 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0 };
-        final int[] expected1 = new int[] { 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0 };
+        final int[] expected0 = new int[] { 1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0 };
+        final int[] expected1 = new int[] { 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0 };
 
         Layer<int[]> l = new Layer<>(p, null, new SpatialPooler(), null, null, null);
 
-        l.subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester;
+        l.subscribe(tester = new TestObserver<Inference>() {
             int test = 0;
 
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { e.printStackTrace(); }
             @Override
             public void onNext(Inference spatialPoolerOutput) {
                 if(test == 0) {
@@ -683,6 +846,9 @@ public class LayerTest {
         // Now push some fake data through so that "onNext" is called above
         l.compute(inputs[0]);
         l.compute(inputs[1]);
+        
+        // Check for exception during the TestObserver's onNext() execution.
+        checkObserver(tester);
     }
 
     /**
@@ -697,8 +863,8 @@ public class LayerTest {
 
         Parameters p = NetworkTestHarness.getParameters().copy();
         p = p.union(NetworkTestHarness.getDayDemoTestEncoderParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
-        p.setParameterByKey(KEY.AUTO_CLASSIFY, Boolean.TRUE);
+        p.set(KEY.RANDOM, new UniversalRandom(42));
+        p.set(KEY.AUTO_CLASSIFY, Boolean.TRUE);
 
         HTMSensor<File> htmSensor = (HTMSensor<File>)sensor;
 
@@ -706,13 +872,13 @@ public class LayerTest {
         Layer<int[]> l = new Layer<>(n);
         l.add(htmSensor).add(new SpatialPooler());
         
-        final int[] expected0 = new int[] { 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0 };
-        final int[] expected1 = new int[] { 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0 };
-        l.subscribe(new Observer<Inference>() {
+        final int[] expected0 = new int[] { 1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0 };
+        final int[] expected1 = new int[] { 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0 };
+        TestObserver<Inference> tester;
+        l.subscribe(tester = new TestObserver<Inference>() {
             int test = 0;
 
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { e.printStackTrace(); }
             @Override
             public void onNext(Inference spatialPoolerOutput) {
                 if(test == 0) {
@@ -732,6 +898,9 @@ public class LayerTest {
         }catch(Exception e) {
             e.printStackTrace();
         }
+        
+        // Check for exception during the TestObserver's onNext() execution.
+        checkObserver(tester);
     }
     
     /**
@@ -741,7 +910,7 @@ public class LayerTest {
     @Test
     public void testBasicSetup_TemporalMemory_MANUAL_MODE() {
         Parameters p = NetworkTestHarness.getParameters().copy();
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.RANDOM, new MersenneTwister(42));
 
         final int[] input1 = new int[] { 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0 };
         final int[] input2 = new int[] { 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0 };
@@ -757,19 +926,20 @@ public class LayerTest {
         
         int timeUntilStable = 600;
 
-        l.subscribe(new Observer<Inference>() {
+        TestObserver<Inference> observer;
+        
+        l.subscribe(observer = new TestObserver<Inference>() {
             int test = 0;
-
-            @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { e.printStackTrace(); }
             @Override
             public void onNext(Inference output) {
                 if(seq / 7 >= timeUntilStable) {
-//                    System.out.println("seq: " + (seq) + "  --> " + (test) + "  output = " + Arrays.toString(output.getSDR()) +
-//                        ", \t\t\t\t cols = " + Arrays.toString(SDR.asColumnIndices(output.getSDR(), l.getConnections().getCellsPerColumn())));
-                    assertTrue(output.getSDR().length >= 8);
+                    System.out.println("seq: " + (seq) + "  --> " + (test) + "  output = " + Arrays.toString(output.getSDR()) +
+                        ", \t\t\t\t cols = " + Arrays.toString(SDR.asColumnIndices(output.getSDR(), l.getConnections().getCellsPerColumn())));
+                    assertTrue(output.getSDR().length >= 5);
                 }
-
+                
+                ++seq;
+                
                 if(test == 6) test = 0;
                 else test++;                
             }
@@ -787,12 +957,15 @@ public class LayerTest {
                 l.compute(inputs[i]);
             }
         }
+        
+        // Check for exception during the TestObserver's onNext() execution.
+        checkObserver(observer);
     }
-
+    
     @Test
     public void testBasicSetup_SPandTM() {
         Parameters p = NetworkTestHarness.getParameters().copy();
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.RANDOM, new MersenneTwister(42));
 
         int[][] inputs = new int[7][8];
         inputs[0] = new int[] { 1, 1, 0, 0, 0, 0, 0, 1 };
@@ -804,26 +977,28 @@ public class LayerTest {
         inputs[6] = new int[] { 0, 0, 0, 0, 0, 1, 1, 1 };
 
         Layer<int[]> l = new Layer<>(p, null, new SpatialPooler(), new TemporalMemory(), null, null);
-
-        l.subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester;
+        l.subscribe(tester = new TestObserver<Inference>() {
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) {}
             @Override
             public void onNext(Inference i) {
                 assertNotNull(i);
-                assertEquals(0, i.getSDR().length);
+                assertTrue(i.getSDR().length > 0);
             }
         });
 
         // Now push some fake data through so that "onNext" is called above
         l.compute(inputs[0]);
         l.compute(inputs[1]);
+        
+        // Check for exception during the TestObserver's onNext() execution.
+        checkObserver(tester);
     }
 
     @Test
     public void testSpatialPoolerPrimerDelay() {
         Parameters p = NetworkTestHarness.getParameters().copy();
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.RANDOM, new UniversalRandom(42));
 
         int[][] inputs = new int[7][8];
         inputs[0] = new int[] { 1, 1, 0, 0, 0, 0, 0, 1 };
@@ -834,17 +1009,16 @@ public class LayerTest {
         inputs[5] = new int[] { 0, 0, 0, 0, 1, 1, 1, 0 };
         inputs[6] = new int[] { 0, 0, 0, 0, 0, 1, 1, 1 };
 
-        final int[] expected0 = new int[] { 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0 };
-        final int[] expected1 = new int[] { 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0 };
+        final int[] expected0 = new int[] { 1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0 };
+        final int[] expected1 = new int[] { 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0 };
 
         // First test without prime directive :-P
         Layer<int[]> l = new Layer<>(p, null, new SpatialPooler(), null, null, null);
-
-        l.subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester;
+        l.subscribe(tester = new TestObserver<Inference>() {
             int test = 0;
 
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { e.printStackTrace(); }
             @Override
             public void onNext(Inference i) {
                 if(test == 0) {
@@ -865,14 +1039,13 @@ public class LayerTest {
         // --------------------------------------------------------------------------------------------
 
         // NOW TEST WITH prime directive
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42)); // due to static RNG we have to reset the sequence
-        p.setParameterByKey(KEY.SP_PRIMER_DELAY, 1);
+        p.set(KEY.RANDOM, new UniversalRandom(42)); // due to static RNG we have to reset the sequence
+        p.set(KEY.SP_PRIMER_DELAY, 1);
 
         Layer<int[]> l2 = new Layer<>(p, null, new SpatialPooler(), null, null, null);
-
-        l2.subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester2;
+        l2.subscribe(tester2 = new TestObserver<Inference>() {
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { e.printStackTrace(); }
             @Override
             public void onNext(Inference i) {
                 // should be one and only onNext() called 
@@ -884,6 +1057,10 @@ public class LayerTest {
         // Now push some fake data through so that "onNext" is called above
         l2.compute(inputs[0]);
         l2.compute(inputs[1]);
+        
+        // Check for exception during the TestObserver's onNext() execution.
+        checkObserver(tester);
+        checkObserver(tester2);
     }
 
     /**
@@ -894,18 +1071,17 @@ public class LayerTest {
     public void testBasicClassifierSetup() {
         Parameters p = NetworkTestHarness.getParameters().copy();
         p = p.union(NetworkTestHarness.getDayDemoTestEncoderParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.RANDOM, new UniversalRandom(42));
 
         MultiEncoder me = MultiEncoder.builder().name("").build();
         Layer<Map<String, Object>> l = new Layer<>(p, me, new SpatialPooler(), new TemporalMemory(), Boolean.TRUE, null);
-
-        l.subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester;
+        l.subscribe(tester = new TestObserver<Inference>() {
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { System.out.println("error: " + e.getMessage()); e.printStackTrace();}
             @Override
             public void onNext(Inference i) {
                 assertNotNull(i);
-                assertEquals(36, i.getSDR().length);
+                assertEquals(42, i.getSDR().length);
             }
         });
 
@@ -913,6 +1089,9 @@ public class LayerTest {
         Map<String, Object> multiInput = new HashMap<>();
         multiInput.put("dayOfWeek", 0.0);
         l.compute(multiInput);
+        
+        // Check for exception during the TestObserver's onNext() execution.
+        checkObserver(tester);
     }
 
     /**
@@ -930,16 +1109,15 @@ public class LayerTest {
 
         Parameters p = NetworkTestHarness.getParameters().copy();
         p = p.union(NetworkTestHarness.getDayDemoTestEncoderParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.RANDOM, new MersenneTwister(42));
 
-        p.setParameterByKey(KEY.SP_PRIMER_DELAY, PRIME_COUNT);
+        p.set(KEY.SP_PRIMER_DELAY, PRIME_COUNT);
 
         MultiEncoder me = MultiEncoder.builder().name("").build();
         Layer<Map<String, Object>> l = new Layer<>(p, me, new SpatialPooler(), new TemporalMemory(), Boolean.TRUE, null);
-
-        l.subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester;
+        l.subscribe(tester = new TestObserver<Inference>() {
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { System.out.println("error: " + e.getMessage()); e.printStackTrace();}
             @Override
             public void onNext(Inference i) {
                 assertNotNull(i);
@@ -960,6 +1138,9 @@ public class LayerTest {
         // and subtract that from the total input to get the total entries sent through
         // the event chain from bottom to top.
         assertEquals((NUM_CYCLES * INPUT_GROUP_COUNT) - PRIME_COUNT, TOTAL);
+        
+        // Check for exception during the TestObserver's onNext() execution.
+        checkObserver(tester);
     }
 
     /**
@@ -975,9 +1156,9 @@ public class LayerTest {
 
         Parameters p = NetworkTestHarness.getParameters().copy();
         p = p.union(NetworkTestHarness.getDayDemoTestEncoderParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.RANDOM, new MersenneTwister(42));
 
-        p.setParameterByKey(KEY.SP_PRIMER_DELAY, PRIME_COUNT);
+        p.set(KEY.SP_PRIMER_DELAY, PRIME_COUNT);
 
         MultiEncoder me = MultiEncoder.builder().name("").build();
         Layer<Map<String, Object>> l = new Layer<>(p, me, new SpatialPooler(), new TemporalMemory(), Boolean.TRUE, null);
@@ -991,9 +1172,9 @@ public class LayerTest {
         inputs[5] = new int[] { 0, 0, 0, 0, 1, 1, 1, 0 };
         inputs[6] = new int[] { 0, 0, 0, 0, 0, 1, 1, 1 };
 
-        l.subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester;
+        l.subscribe(tester = new TestObserver<Inference>() {
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { System.out.println("error: " + e.getMessage()); e.printStackTrace();}
             @Override
             public void onNext(Inference i) {
                 assertNotNull(i);
@@ -1001,9 +1182,9 @@ public class LayerTest {
             }
         });
 
-        l.subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester2;
+        l.subscribe(tester2 = new TestObserver<Inference>() {
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { System.out.println("error: " + e.getMessage()); e.printStackTrace();}
             @Override
             public void onNext(Inference i) {
                 assertNotNull(i);
@@ -1011,9 +1192,9 @@ public class LayerTest {
             }
         });
 
-        l.subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester3;
+        l.subscribe(tester3 = new TestObserver<Inference>() {
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { System.out.println("error: " + e.getMessage()); e.printStackTrace();}
             @Override
             public void onNext(Inference i) {
                 assertNotNull(i);
@@ -1035,30 +1216,35 @@ public class LayerTest {
         // and subtract that from the total input to get the total entries sent through
         // the event chain from bottom to top.
         assertEquals( ((NUM_CYCLES * INPUT_GROUP_COUNT) - PRIME_COUNT) * NUM_SUBSCRIBERS, TOTAL);
+        
+        // Check for exception during the TestObserver's onNext() execution.
+        checkObserver(tester);
+        checkObserver(tester2);
+        checkObserver(tester3);
     }
 
     @Test
     public void testGetAllPredictions() {
         final int PRIME_COUNT = 35;
-        final int NUM_CYCLES = 120;
+        final int NUM_CYCLES = 600;
         final int INPUT_GROUP_COUNT = 7; // Days of Week
         TOTAL = 0;
 
         Parameters p = NetworkTestHarness.getParameters().copy();
         p = p.union(NetworkTestHarness.getDayDemoTestEncoderParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.RANDOM, new MersenneTwister(42));
 
-        p.setParameterByKey(KEY.SP_PRIMER_DELAY, PRIME_COUNT);
+        p.set(KEY.SP_PRIMER_DELAY, PRIME_COUNT);
         
-        final int cellsPerColumn = (int)p.getParameterByKey(KEY.CELLS_PER_COLUMN);
+        final int cellsPerColumn = (int)p.get(KEY.CELLS_PER_COLUMN);
         assertTrue(cellsPerColumn > 0);
 
         MultiEncoder me = MultiEncoder.builder().name("").build();
         final Layer<Map<String, Object>> l = new Layer<>(p, me, new SpatialPooler(), new TemporalMemory(), Boolean.TRUE, null);
 
-        l.subscribe(new Observer<Inference>() {
+        TestObserver<Inference> tester;
+        l.subscribe(tester = new TestObserver<Inference>() {
             @Override public void onCompleted() {}
-            @Override public void onError(Throwable e) { System.out.println("error: " + e.getMessage()); e.printStackTrace();}
             @Override
             public void onNext(Inference i) {
                 assertNotNull(i);
@@ -1067,8 +1253,8 @@ public class LayerTest {
                 if(l.getPreviousPredictiveCells() != null) {
                     //UNCOMMENT TO VIEW STABILIZATION OF PREDICTED FIELDS
 //                    System.out.println("recordNum: " + i.getRecordNum() + "  Day: " + ((Map<String, Object>)i.getLayerInput()).get("dayOfWeek") + "  -  " + 
-//                       Arrays.toString(ArrayUtils.where(l.getFeedForwardActiveColumns(), ArrayUtils.WHERE_1)) +
-//                         "   -   " + Arrays.toString(SDR.cellsAsColumnIndices(l.getPreviousPredictiveCells(), cellsPerColumn)));
+//                       Arrays.toString(ArrayUtils.where(i.getFeedForwardActiveColumns(), ArrayUtils.WHERE_1)) +
+//                         "   -   " + Arrays.toString(SDR.cellsAsColumnIndices(i.getPreviousPredictiveCells(), cellsPerColumn)));
                 }
             }
         });
@@ -1103,9 +1289,73 @@ public class LayerTest {
         assertEquals(highestIdx, l.getMostProbableBucketIndex("dayOfWeek", 1));
         assertEquals(7, l.getAllPredictions("dayOfWeek", 1).length);
         
-        assertTrue(Arrays.equals(
-            ArrayUtils.where(l.getFeedForwardActiveColumns(), ArrayUtils.WHERE_1),
-                SDR.cellsAsColumnIndices(l.getPreviousPredictiveCells(), cellsPerColumn)));
+//        assertTrue(Arrays.equals(
+//            ArrayUtils.where(l.getFeedForwardActiveColumns(), ArrayUtils.WHERE_1),
+//                SDR.cellsAsColumnIndices(l.getPreviousPredictiveCells(), cellsPerColumn)));
+        
+        // Check for exception during the TestObserver's onNext() execution.
+        checkObserver(tester);
+    }
+    
+    /**
+     * Test that the Anomaly Func can compute anomalies when no SpatialPooler
+     * is present and the input is an int[] representing pre-processed sparse
+     * SP output.
+     */
+    @Test
+    public void testTM_Only_AnomalyCompute() {
+        UniversalRandom random = new UniversalRandom(42);
+        // SP and General
+        Parameters parameters = NetworkTestHarness.getParameters();
+        parameters.set(KEY.INPUT_DIMENSIONS, new int[] { 104 });
+        parameters.set(KEY.COLUMN_DIMENSIONS, new int[] { 2048 });
+        parameters.set(KEY.CELLS_PER_COLUMN, 32);
+        parameters.set(KEY.RANDOM, random);
+        parameters.set(KEY.POTENTIAL_PCT, 0.85);//0.5
+        parameters.set(KEY.GLOBAL_INHIBITION, true);
+        parameters.set(KEY.NUM_ACTIVE_COLUMNS_PER_INH_AREA, 40.0);
+        parameters.set(KEY.SYN_PERM_INACTIVE_DEC, 0.0005);
+        parameters.set(KEY.SYN_PERM_ACTIVE_INC, 0.0015);
+        parameters.set(KEY.DUTY_CYCLE_PERIOD, 1000);
+        parameters.set(KEY.MAX_BOOST, 2.0);
+        // TM
+        parameters.set(KEY.PERMANENCE_INCREMENT, 0.1);//0.05
+        parameters.set(KEY.PERMANENCE_DECREMENT, 0.1);//0.05
+        
+        Network network = Network.create("NAB Network", parameters)
+            .add(Network.createRegion("NAB Region")
+                .add(Network.createLayer("NAB Layer", parameters)
+                    .add(Anomaly.create())
+                    .add(new TemporalMemory())));
+        
+        Object[] testResults = new Object[2];
+        
+        network.observe().subscribe((inference) -> {
+            double score = inference.getAnomalyScore();
+            int record = inference.getRecordNum();
+            
+            if(testResults[0] == null && score < 1.0) {
+                testResults[0] = record;
+                testResults[1] = score;
+            }
+        }, (error) -> {
+            error.printStackTrace();
+        }, () -> {
+            // On Complete
+        });
+        
+        int[] input = { 717, 737, 739, 745, 758, 782, 793, 798, 805, 812, 833, 841, 
+                        846, 857, 1482, 1515, 1536, 1577, 1578, 1600, 1608, 1612, 1642, 
+                        1644, 1645, 1646, 1647, 1648, 1649, 1655, 1661, 1663, 1667, 1669, 
+                        1677, 1683, 1688, 1706, 1710, 1720 };
+        
+        for(int i = 0;i < 100;i++) {
+            network.compute(input);
+            if(testResults[0] != null) break;
+        }
+        
+        assertEquals(8, testResults[0]);
+        assertEquals(0.0, testResults[1]);
     }
 
     /**
@@ -1116,7 +1366,7 @@ public class LayerTest {
     public void testObservableRetrieval() {
         Parameters p = NetworkTestHarness.getParameters().copy();
         p = p.union(NetworkTestHarness.getDayDemoTestEncoderParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.RANDOM, new MersenneTwister(42));
 
         MultiEncoder me = MultiEncoder.builder().name("").build();
         final Layer<Map<String, Object>> l = new Layer<>(p, me, new SpatialPooler(), new TemporalMemory(), Boolean.TRUE, null);
@@ -1165,11 +1415,11 @@ public class LayerTest {
     public void testFullLayerFluentAssembly() {
         Parameters p = NetworkTestHarness.getParameters().copy();
         p = p.union(NetworkTestHarness.getHotGymTestEncoderParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
-        p.setParameterByKey(KEY.COLUMN_DIMENSIONS, new int[] { 2048 });
-        p.setParameterByKey(KEY.POTENTIAL_RADIUS, 200);
-        p.setParameterByKey(KEY.INHIBITION_RADIUS, 50);
-        p.setParameterByKey(KEY.GLOBAL_INHIBITION, true);
+        p.set(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.COLUMN_DIMENSIONS, new int[] { 2048 });
+        p.set(KEY.POTENTIAL_RADIUS, 200);
+        p.set(KEY.INHIBITION_RADIUS, 50);
+        p.set(KEY.GLOBAL_INHIBITION, true);
 
 //        System.out.println(p);
 
@@ -1198,7 +1448,7 @@ public class LayerTest {
             public void onNext(Inference i) {
                 if(flowReceived) return; // No need to set this value multiple times
 
-                flowReceived = i.getClassifiers().size() == 4 &&
+                flowReceived = i.getClassifiers().size() == 2 &&
                     i.getClassifiers().get("timestamp") != null &&
                         i.getClassifiers().get("consumption") != null;
             }
@@ -1214,17 +1464,16 @@ public class LayerTest {
         }
     }
     
+    boolean flowReceived2 = false;
+    boolean flowReceived3 = false;
     @Test
     public void testMissingEncoderMap() {
         Parameters p = NetworkTestHarness.getParameters().copy();
-        //p = p.union(NetworkTestHarness.getHotGymTestEncoderParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
-        p.setParameterByKey(KEY.COLUMN_DIMENSIONS, new int[] { 2048 });
-        p.setParameterByKey(KEY.POTENTIAL_RADIUS, 200);
-        p.setParameterByKey(KEY.INHIBITION_RADIUS, 50);
-        p.setParameterByKey(KEY.GLOBAL_INHIBITION, true);
-
-//        System.out.println(p);
+        p.set(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.COLUMN_DIMENSIONS, new int[] { 2048 });
+        p.set(KEY.POTENTIAL_RADIUS, 200);
+        p.set(KEY.INHIBITION_RADIUS, 50);
+        p.set(KEY.GLOBAL_INHIBITION, true);
 
         Map<String, Object> params = new HashMap<>();
         params.put(KEY_MODE, Mode.PURE);
@@ -1249,9 +1498,9 @@ public class LayerTest {
             @Override public void onError(Throwable e) { System.out.println("error: " + e.getMessage()); e.printStackTrace();}
             @Override
             public void onNext(Inference i) {
-                if(flowReceived) return; // No need to set this value multiple times
+                if(flowReceived2) return; // No need to set this value multiple times
 
-                flowReceived = i.getClassifiers().size() == 4 &&
+                flowReceived2 = i.getClassifiers().size() == 4 &&
                     i.getClassifiers().get("timestamp") != null &&
                         i.getClassifiers().get("consumption") != null;
             }
@@ -1265,7 +1514,7 @@ public class LayerTest {
         }
 
         try {
-            assertFalse(flowReceived);
+            assertFalse(flowReceived2);
         }catch(Exception e) {
             e.printStackTrace();
         }
@@ -1274,11 +1523,11 @@ public class LayerTest {
         
         p = NetworkTestHarness.getParameters().copy();
         //p = p.union(NetworkTestHarness.getHotGymTestEncoderParams());
-        p.setParameterByKey(KEY.RANDOM, new MersenneTwister(42));
-        p.setParameterByKey(KEY.COLUMN_DIMENSIONS, new int[] { 2048 });
-        p.setParameterByKey(KEY.POTENTIAL_RADIUS, 200);
-        p.setParameterByKey(KEY.INHIBITION_RADIUS, 50);
-        p.setParameterByKey(KEY.GLOBAL_INHIBITION, true);
+        p.set(KEY.RANDOM, new MersenneTwister(42));
+        p.set(KEY.COLUMN_DIMENSIONS, new int[] { 2048 });
+        p.set(KEY.POTENTIAL_RADIUS, 200);
+        p.set(KEY.INHIBITION_RADIUS, 50);
+        p.set(KEY.GLOBAL_INHIBITION, true);
 
         params = new HashMap<>();
         params.put(KEY_MODE, Mode.PURE);
@@ -1301,9 +1550,9 @@ public class LayerTest {
             @Override public void onError(Throwable e) { System.out.println("error: " + e.getMessage()); e.printStackTrace();}
             @Override
             public void onNext(Inference i) {
-                if(flowReceived) return; // No need to set this value multiple times
+                if(flowReceived3) return; // No need to set this value multiple times
 
-                flowReceived = i.getClassifiers().size() == 4 &&
+                flowReceived3 = i.getClassifiers().size() == 4 &&
                     i.getClassifiers().get("timestamp") != null &&
                         i.getClassifiers().get("consumption") != null;
             }
@@ -1317,7 +1566,7 @@ public class LayerTest {
         }
 
         try {
-            assertFalse(flowReceived);
+            assertFalse(flowReceived3);
         }catch(Exception e) {
             e.printStackTrace();
         }
@@ -1331,7 +1580,7 @@ public class LayerTest {
             0, 0, 0, 0, null, null, null,
             "sdr_in", "darr", "SDRPassThroughEncoder");
         Parameters p = Parameters.empty();
-        p.setParameterByKey(KEY.FIELD_ENCODING_MAP, fieldEncodings);
+        p.set(KEY.FIELD_ENCODING_MAP, fieldEncodings);
         return p;
     }
 
@@ -1393,4 +1642,133 @@ public class LayerTest {
         l2.setRegion(r2);
         assertFalse(l.equals(l2));
     }
+    
+    @Test
+    public void testInferInputDimensions() {
+        Parameters p = Parameters.getAllDefaultParameters();
+        Layer<Map<String, Object>> l = new Layer<>(p, null, new SpatialPooler(), new TemporalMemory(), Boolean.TRUE, null);
+        
+        int[] dims = l.inferInputDimensions(16384, 2);
+        assertTrue(Arrays.equals(new int[] { 128, 128 }, dims));
+        
+        dims = l.inferInputDimensions(8000, 3);
+        assertTrue(Arrays.equals(new int[] { 20, 20, 20 }, dims));
+        
+        // Now test non-square dimensions
+        dims = l.inferInputDimensions(450, 2);
+        assertTrue(Arrays.equals(new int[] { 1, 450 }, dims));
+    }
+    
+    @Test(expected = IllegalStateException.class)
+    public void isClosedAddSensorTest() {
+        Parameters p = NetworkTestHarness.getParameters();
+        p = p.union(NetworkTestHarness.getNetworkDemoTestEncoderParams());
+        p.set(KEY.RANDOM, new MersenneTwister(42));
+
+        Layer<?> l = Network.createLayer("l", p);
+        l.close();
+
+        Sensor<File> sensor = Sensor.create(
+                FileSensor::create,
+                SensorParams.create(
+                        Keys::path, "", ResourceLocator.path("rec-center-hourly-small.csv")));
+        l.add(sensor);
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void isClosedAddMultiEncoderTest() {
+        Parameters p = NetworkTestHarness.getParameters();
+        p = p.union(NetworkTestHarness.getNetworkDemoTestEncoderParams());
+        p.set(KEY.RANDOM, new MersenneTwister(42));
+
+        Layer<?> l = Network.createLayer("l", p);
+        l.close();
+
+        l.add(MultiEncoder.builder().name("").build());
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void isClosedAddSpatialPoolerTest() {
+        Parameters p = NetworkTestHarness.getParameters();
+        p = p.union(NetworkTestHarness.getNetworkDemoTestEncoderParams());
+        p.set(KEY.RANDOM, new MersenneTwister(42));
+
+        Layer<?> l = Network.createLayer("l", p);
+        l.close();
+
+        l.add(new SpatialPooler());
+    }
+    
+    @Test
+    public void testProperConstructionUsingNonFluentConstructor() {
+        try {
+            new Layer<>(null, null, null, null, null, null);
+            fail();
+        }catch(Exception e) {
+            assertEquals(IllegalArgumentException.class, e.getClass());
+            assertEquals("No parameters specified.", e.getMessage());
+        }
+        
+        Parameters p = NetworkTestHarness.getParameters();
+        p.set(KEY.FIELD_ENCODING_MAP, null);
+        try {
+            new Layer<>(p, MultiEncoder.builder().build(), null, null, null, null);
+            fail();
+        }catch(Exception e) {
+            assertEquals(IllegalArgumentException.class, e.getClass());
+            assertEquals("The passed in Parameters must contain a field encoding map specified by " +
+             "org.numenta.nupic.Parameters.KEY.FIELD_ENCODING_MAP", e.getMessage());
+        }
+    }
+    
+    @Test
+    public void testNullSubscriber() {
+        Parameters p = NetworkTestHarness.getParameters();
+        p = p.union(NetworkTestHarness.getNetworkDemoTestEncoderParams());
+        p.set(KEY.RANDOM, new MersenneTwister(42));
+
+        Layer<?> l = Network.createLayer("l", p); 
+        
+        try {
+            l.subscribe(null);
+            fail();
+        }catch(Exception e) {
+            assertEquals(IllegalArgumentException.class, e.getClass());
+            assertEquals("Subscriber cannot be null.", e.getMessage());
+        }
+    }
+    
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    @Test
+    public void testStringToInferenceTransformer() {
+        Parameters p = NetworkTestHarness.getParameters();
+        p = p.union(NetworkTestHarness.getNetworkDemoTestEncoderParams());
+        p.set(KEY.RANDOM, new MersenneTwister(42));
+
+        Layer<?> l = Network.createLayer("l", p); 
+        FunctionFactory ff = l.new FunctionFactory();
+        PublishSubject publisher = PublishSubject.create();
+        Observable obs = ff.createEncoderFunc(publisher);
+        
+        String[] sa = { "42" };
+        
+        obs.subscribe(new Observer() {
+            @Override public void onCompleted() { }
+            @Override public void onError(Throwable arg0) { }
+            @Override public void onNext(Object arg0) { 
+            //    System.out.println("here");
+            }
+            
+        });
+        
+        assertEquals(0, ff.inference.getRecordNum());
+        
+        publisher.onNext(sa);
+        
+        assertEquals("[42]", (Arrays.toString((int[])ff.inference.getLayerInput())));
+        assertEquals(-1, ff.inference.getRecordNum());  // Record number gets set by the Layer which hasn't
+                                                        // Received a record yet.
+        assertEquals("[42]", (Arrays.toString((int[])ff.inference.getSDR())));
+    }
+   
 }

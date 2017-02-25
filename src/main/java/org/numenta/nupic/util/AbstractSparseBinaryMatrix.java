@@ -25,6 +25,8 @@ package org.numenta.nupic.util;
 import java.lang.reflect.Array;
 import java.util.Arrays;
 
+import org.numenta.nupic.model.Persistable;
+
 import gnu.trove.TIntCollection;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
@@ -35,11 +37,14 @@ import gnu.trove.set.hash.TIntHashSet;
 /**
  * Base class for matrices containing specifically binary (0 or 1) integer values
  * 
- * @author cogmission
+ * @author David Ray
  * @author Jose Luis Martin
  */
 @SuppressWarnings("rawtypes")
-public abstract class AbstractSparseBinaryMatrix extends AbstractSparseMatrix {
+public abstract class AbstractSparseBinaryMatrix extends AbstractSparseMatrix implements Persistable {
+    /** keep it simple */
+    private static final long serialVersionUID = 1L;
+    
     private int[] trueCounts;
 
     /**
@@ -85,8 +90,8 @@ public abstract class AbstractSparseBinaryMatrix extends AbstractSparseMatrix {
      */
     protected void sliceError(int... coordinates) {
         throw new IllegalArgumentException(
-                "This method only returns the array holding the specified index: " + 
-                        Arrays.toString(coordinates));
+            "This method only returns the array holding the specified maximum index: " + 
+                    Arrays.toString(dimensions));
     }
     
     /**
@@ -96,14 +101,16 @@ public abstract class AbstractSparseBinaryMatrix extends AbstractSparseMatrix {
     protected int[] getSliceIndexes(int[] coordinates) {
         int[] dimensions = getDimensions();
         // check for valid coordinates
-        if (coordinates.length >= dimensions.length)
+        if (coordinates.length >= dimensions.length) {
             sliceError(coordinates);
+        }
 
         int sliceDimensionsLength = dimensions.length - coordinates.length;
         int[] sliceDimensions = (int[]) Array.newInstance(int.class, sliceDimensionsLength);
 
-        for (int i = coordinates.length ; i < dimensions.length; i++) 
+        for (int i = coordinates.length ; i < dimensions.length; i++) { 
             sliceDimensions[i - coordinates.length] = dimensions[i];
+        }
 
         int[] elementCoordinates = Arrays.copyOf(coordinates, coordinates.length + 1);
         int sliceSize = Arrays.stream(sliceDimensions).reduce((n,i) -> n*i).getAsInt();
@@ -135,7 +142,16 @@ public abstract class AbstractSparseBinaryMatrix extends AbstractSparseMatrix {
      * @param results			the results array
      */
     public abstract void rightVecSumAtNZ(int[] inputVector, int[] results);
-
+    
+    /**
+     * Fills the specified results array with the result of the 
+     * matrix vector multiplication.
+     * 
+     * @param inputVector       the right side vector
+     * @param results           the results array
+     */
+    public abstract void rightVecSumAtNZ(int[] inputVector, int[] results, double stimulusThreshold);
+        
     /**
      * Sets the value at the specified index.
      * 
@@ -238,8 +254,9 @@ public abstract class AbstractSparseBinaryMatrix extends AbstractSparseMatrix {
     public void clearStatistics(int row) {
         trueCounts[row] = 0;
         
-        for (int index : getSliceIndexes(new int[] { row }))
+        for (int index : getSliceIndexes(new int[] { row })) {
             set(index, 0);
+        }
     }
 
     /**
@@ -270,8 +287,9 @@ public abstract class AbstractSparseBinaryMatrix extends AbstractSparseMatrix {
     public int[] getSparseIndices() {
         TIntList indexes = new TIntArrayList();
         for (int i = 0; i <= getMaxIndex(); i ++) {
-            if (get(i) > 0)
+            if (get(i) > 0) {
                 indexes.add(i);
+            }
         }
         
         return indexes.toArray();
@@ -409,5 +427,33 @@ public abstract class AbstractSparseBinaryMatrix extends AbstractSparseMatrix {
             if(keySet.contains(i)) return true;
         }
         return false;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = super.hashCode();
+        result = prime * result + Arrays.hashCode(trueCounts);
+        return result;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if(this == obj)
+            return true;
+        if(!super.equals(obj))
+            return false;
+        if(getClass() != obj.getClass())
+            return false;
+        AbstractSparseBinaryMatrix other = (AbstractSparseBinaryMatrix)obj;
+        if(!Arrays.equals(trueCounts, other.trueCounts))
+            return false;
+        return true;
     }
 }
