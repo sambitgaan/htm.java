@@ -107,7 +107,11 @@ public class UniversalRandomTest {
         System.setOut(out);
         
         String output = baos.toString();
+<<<<<<< HEAD
         String[] lines = output.split("\n");
+=======
+        String[] lines = output.split(System.lineSeparator());
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
         
         Arrays.stream(lines).forEach(System.out::println);
         

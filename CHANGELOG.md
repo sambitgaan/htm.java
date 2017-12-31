@@ -13,10 +13,46 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ***
 
+<<<<<<< HEAD
 ## Unreleased [0.6.10-SNAPSHOT]
 #### Removed
 #### Added
 #### Changed  
+=======
+## Unreleased [0.6.14-SNAPSHOT]
+#### Removed
+#### Added
+#### Changed  
+#### Fixed 
+
+***
+
+## [v0.6.13-alpha]  Hot Fix!
+#### Removed
+#### Added
+* [[PR #518](https://github.com/numenta/htm.java/pull/518)] Added FieldMetaTypeTest.java
+#### Changed  
+#### Fixed
+* [[PR #518](https://github.com/numenta/htm.java/pull/518)] Fixed "bool" type decode bug
+
+***
+
+## [v0.6.12-alpha]
+#### Removed
+#### Added
+* [[PR #511](https://github.com/numenta/htm.java/pull/511)] SDRClassifier Network API Integration
+* [[PR #511](https://github.com/numenta/htm.java/pull/511)] Added new Classifier.java interface
+* [[PR #511](https://github.com/numenta/htm.java/pull/511)] Added Tests for new integration
+#### Changed  
+#### Fixed
+
+***
+
+## [v0.6.10-alpha]
+#### Removed
+#### Added
+#### Changed  
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
 * [[PR #496](https://github.com/numenta/htm.java/pull/496)] Moved ```Connections.java``` and ```ComputeCycle.java``` and other "model" files to package: org.numenta.nupic.model
 * [[PR #496](https://github.com/numenta/htm.java/pull/496)] Updated the TemporalMemory and all unit/compatibility tests to be in sync with latest NuPIC version (Updated: 2016-09-23 SHA 1036f25e7223471d72cebc536d6734f78d37b6c7)
 * [[PR #486](https://github.com/numenta/htm.java/pull/486)] Updated the SpatialPooler and all unit/compatibility tests to be in sync with latest NuPIC version (Updated: 2016-09-22 SHA a3587db662ddc365ed371c81eb4166a41ad4bc3d)  

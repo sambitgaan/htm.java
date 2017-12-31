@@ -21,6 +21,10 @@
  */
 package org.numenta.nupic.network;
 
+<<<<<<< HEAD
+=======
+import java.lang.Thread.UncaughtExceptionHandler;
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.util.ArrayList;
@@ -36,11 +40,22 @@ import org.joda.time.DateTime;
 import org.numenta.nupic.FieldMetaType;
 import org.numenta.nupic.Parameters;
 import org.numenta.nupic.Parameters.KEY;
+<<<<<<< HEAD
+=======
+import org.numenta.nupic.algorithms.Classification;
+import org.numenta.nupic.algorithms.TemporalMemory;
+import org.numenta.nupic.algorithms.SpatialPooler;
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
 import org.numenta.nupic.algorithms.Anomaly;
+import org.numenta.nupic.algorithms.Classifier;
+import org.numenta.nupic.algorithms.SDRClassifier;
 import org.numenta.nupic.algorithms.CLAClassifier;
+<<<<<<< HEAD
 import org.numenta.nupic.algorithms.Classification;
 import org.numenta.nupic.algorithms.SpatialPooler;
 import org.numenta.nupic.algorithms.TemporalMemory;
+=======
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
 import org.numenta.nupic.encoders.DateEncoder;
 import org.numenta.nupic.encoders.Encoder;
 import org.numenta.nupic.encoders.EncoderTuple;
@@ -231,7 +246,7 @@ public class Layer<T> implements Persistable {
     private boolean hasGenericProcess;
 
     /**
-     * List of {@link Encoders} used when storing bucket information see
+     * List of {@link Encoder}s used when storing bucket information see
      * {@link #doEncoderBucketMapping(Inference, Map)}
      */
     private List<EncoderTuple> encoderTuples;
@@ -399,7 +414,11 @@ public class Layer<T> implements Persistable {
                 (encoder == null ? "" : "MultiEncoder,"), 
                 (spatialPooler == null ? "" : "SpatialPooler,"), 
                 (temporalMemory == null ? "" : "TemporalMemory,"), 
+<<<<<<< HEAD
                 (autoCreateClassifiers == null ? "" : "Auto creating CLAClassifiers for each input field."), 
+=======
+                (autoCreateClassifiers == null ? "" : "Auto creating Classifiers for each input field."),
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
                 (anomalyComputer == null ? "" : "Anomaly"));
         }
     }
@@ -1048,7 +1067,11 @@ public class Layer<T> implements Persistable {
     /**
      * Restarts this {@code Layer}
      * 
+<<<<<<< HEAD
      * {@link #restart()} is to be called after a call to {@link #halt()}, to begin
+=======
+     * {@link #restart} is to be called after a call to {@link #halt()}, to begin
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
      * processing again. The {@link Network} will continue from where it previously
      * left off after the last call to halt().
      * 
@@ -1180,7 +1203,7 @@ public class Layer<T> implements Persistable {
     }
 
     /**
-     * Returns the previous predictive {@link Cells}
+     * Returns the previous predictive {@link Cell}s
      * 
      * @return the binary vector representing the current prediction.
      */
@@ -1472,7 +1495,7 @@ public class Layer<T> implements Persistable {
      * </p>
      * <p>
      * If any algorithms are repeated then {@link Inference}s will
-     * <em><b>NOT</b></em> be shared between layers. {@link Regions}
+     * <em><b>NOT</b></em> be shared between layers. {@link Region}s
      * <em><b>NEVER</b></em> share {@link Inference}s
      * </p>
      * 
@@ -1657,7 +1680,11 @@ public class Layer<T> implements Persistable {
     
     /**
      * Executes the check point logic, handles the return of the serialized byte array
+<<<<<<< HEAD
      * by delegating the call to {@link rx.Observer#onNext(byte[])} of all the currently queued
+=======
+     * by delegating the call to {@link rx.Observer#onNext}(byte[]) of all the currently queued
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
      * Observers; then clears the list of Observers.
      */
     private void doCheckPoint() {
@@ -1712,7 +1739,15 @@ public class Layer<T> implements Persistable {
             int[] tempArray = new int[e.getWidth()];
             System.arraycopy(encoding, offset, tempArray, 0, tempArray.length);
 
-            inference.getClassifierInput().put(name, new NamedTuple(new String[] { "name", "inputValue", "bucketIdx", "encoding" }, name, o, bucketIdx, tempArray));
+            inference.getClassifierInput().put(
+                    name,
+                    new NamedTuple(
+                            new String[] { "name", "inputValue", "bucketIdx", "encoding" },
+                            name,
+                            o,
+                            bucketIdx,
+                            tempArray
+                    ));
         }
     }
 
@@ -1798,9 +1833,9 @@ public class Layer<T> implements Persistable {
 
     /**
      * Called internally to create a subscription on behalf of the specified
-     * {@link LayerObserver}
+     * Layer {@link Observer}
      * 
-     * @param sub       the LayerObserver (subscriber).
+     * @param sub       the Layer Observer (subscriber).
      * @return
      */
     private Subscription createSubscription(final Observer<Inference> sub) {
@@ -1908,13 +1943,41 @@ public class Layer<T> implements Persistable {
      * @param encoder
      * @return
      */
+    @SuppressWarnings("unchecked")
     NamedTuple makeClassifiers(MultiEncoder encoder) {
+        Map<String, Class<? extends Classifier>> inferredFields = (Map<String, Class<? extends Classifier>>) params.get(KEY.INFERRED_FIELDS);
+        if(inferredFields == null || inferredFields.entrySet().size() == 0) {
+            throw new IllegalStateException(
+                    "KEY.AUTO_CLASSIFY has been set to \"true\", but KEY.INFERRED_FIELDS is null or\n\t" +
+                    "empty. Must specify desired Classifier for at least one input field in\n\t" +
+                    "KEY.INFERRED_FIELDS or set KEY.AUTO_CLASSIFY to \"false\" (which is its default\n\t" +
+                    "value in Parameters)."
+            );
+        }
         String[] names = new String[encoder.getEncoders(encoder).size()];
-        CLAClassifier[] ca = new CLAClassifier[names.length];
+        Classifier[] ca = new Classifier[names.length];
         int i = 0;
         for(EncoderTuple et : encoder.getEncoders(encoder)) {
             names[i] = et.getName();
-            ca[i] = new CLAClassifier();
+            Class fieldClassifier = inferredFields.get(et.getName());
+            if(fieldClassifier == null) {
+                LOGGER.info("Not classifying \"" + et.getName() + "\" input field");
+            }
+            else if(CLAClassifier.class.isAssignableFrom(fieldClassifier)) {
+                LOGGER.info("Classifying \"" + et.getName() + "\" input field with CLAClassifier");
+                ca[i] = new CLAClassifier();
+            }
+            else if(SDRClassifier.class.isAssignableFrom(fieldClassifier)) {
+                LOGGER.info("Classifying \"" + et.getName() + "\" input field with SDRClassifier");
+                ca[i] = new SDRClassifier();
+            }
+            else {
+                throw new IllegalStateException(
+                        "Invalid Classifier class token, \"" + fieldClassifier + "\",\n\t" +
+                        "specified for, \"" + et.getName() + "\", input field.\n\t" +
+                        "Valid class tokens are CLAClassifier.class and SDRClassifier.class"
+                );
+            }
             i++;
         }
         return new NamedTuple(names, (Object[])ca);
@@ -1973,11 +2036,16 @@ public class Layer<T> implements Persistable {
      * Starts this {@code Layer}'s thread
      */
     protected void startLayerThread() {
+<<<<<<< HEAD
         (LAYER_THREAD = new Thread("Sensor Layer [" + getName() + "] Thread") {
+=======
+        LAYER_THREAD = new Thread("Sensor Layer [" + getName() + "] Thread") {
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
 
             @SuppressWarnings("unchecked")
             public void run() {
                 LOGGER.debug("Layer [" + getName() + "] started Sensor output stream processing.");
+<<<<<<< HEAD
 
                 // Applies "terminal" function, at this point the input stream
                 // is "sealed".
@@ -1998,6 +2066,28 @@ public class Layer<T> implements Persistable {
                 }).forEach(intArray -> {
                     ((ManualInput)Layer.this.factory.inference).encoding(intArray);
 
+=======
+
+                // Applies "terminal" function, at this point the input stream
+                // is "sealed".
+                sensor.getOutputStream().filter(i -> {
+                    if(isHalted) {
+                        notifyComplete();
+                        if(next != null) {
+                            next.halt();
+                        }
+                        return false;
+                    }
+                    
+                    if(Thread.currentThread().isInterrupted()) {
+                        notifyError(new RuntimeException("Unknown Exception while filtering input"));
+                    }
+
+                    return true;
+                }).forEach(intArray -> {
+                    ((ManualInput)Layer.this.factory.inference).encoding(intArray);
+
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
                     Layer.this.compute((T)intArray);
 
                     // Notify all downstream observers that the stream is closed
@@ -2006,7 +2096,20 @@ public class Layer<T> implements Persistable {
                     }
                 });
             }
+<<<<<<< HEAD
         }).start();
+=======
+        };
+        
+        LAYER_THREAD.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
+			
+			@Override
+			public void uncaughtException(Thread t, Throwable e) {
+				notifyError(new RuntimeException("Unhandled Exception in "+LAYER_THREAD.getName(),e));
+			}
+		});
+        LAYER_THREAD.start();
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
     }
     
     /**
@@ -2014,8 +2117,12 @@ public class Layer<T> implements Persistable {
      * that stores the state of this {@code Network} while keeping the Network up and running.
      * The Network will be stored at the pre-configured location (in binary form only, not JSON).
      * 
+<<<<<<< HEAD
      * @param network   the {@link Network} to check point.
      * @return  the {@link CheckPointOp} operator 
+=======
+     * @return  the {@link CheckPointOp} operator
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
      */
     @SuppressWarnings("unchecked")
     CheckPointOp<byte[]> getCheckPointOperator() {
@@ -2328,10 +2435,18 @@ public class Layer<T> implements Persistable {
                         bucketIdx = inputs.get("bucketIdx");
                         actValue = inputs.get("inputValue");
 
+<<<<<<< HEAD
                         CLAClassifier c = (CLAClassifier)t1.getClassifiers().get(key);
                         Classification<Object> result = c.compute(recordNum, inputMap, t1.getSDR(), isLearn, true);
+=======
+                        Classifier c = (Classifier)t1.getClassifiers().get(key);
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
 
-                        t1.recordNum(recordNum).storeClassification((String)inputs.get("name"), result);
+                        // c will be null if no classifier was specified for this field in KEY.INFERRED_FIELDS map
+                        if(c != null) {
+                            Classification<Object> result = c.compute(recordNum, inputMap, t1.getSDR(), isLearn, true);
+                            t1.recordNum(recordNum).storeClassification((String)inputs.get("name"), result);
+                        }
                     }
 
                     return t1;

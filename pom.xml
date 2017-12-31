@@ -4,7 +4,11 @@
 
 	<groupId>org.numenta</groupId>
 	<artifactId>htm.java</artifactId>
+<<<<<<< HEAD
 	<version>0.6.11</version>
+=======
+	<version>0.6.13</version>
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
 	<name>htm.java</name>
 	<description>The Java version of Numenta's HTM technology</description>
 
@@ -31,6 +35,7 @@
 		</developer>
 	</developers>
 
+<<<<<<< HEAD
 <<<<<<< HEAD
   <dependencies>
     <dependency>
@@ -126,6 +131,8 @@
     </dependency>
   </dependencies>
 =======
+=======
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
 	<repositories>
 		<repository>
 			<id>repo</id>

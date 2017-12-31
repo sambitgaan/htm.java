@@ -3,8 +3,12 @@
 
 <br>
 
+<<<<<<< HEAD
 [![htm.java awesomeness](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](http://cogmission.ai) [![AGI Probability](https://img.shields.io/badge/AGI%20Probability-97%25-blue.svg)](http://numenta.com/#hero) [![Coolness Factor](https://img.shields.io/badge/Coolness%20Factor-100%25-blue.svg)](https://github.com/numenta/htm.java-examples) [![Build Status](https://travis-ci.org/numenta/htm.java.png?branch=master)](https://travis-ci.org/numenta/htm.java) [![Coverage Status](https://coveralls.io/repos/numenta/htm.java/badge.svg?branch=master&service=github)](https://coveralls.io/github/numenta/htm.java?branch=master) [![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.numenta/htm.java/badge.svg)](https://maven-badges.herokuapp.com/maven-central/org.numenta/htm.java) [![][license img]][license] [![docs-badge][]][docs] [![Gitter](https://badges.gitter.im/Join  
 Chat.svg)](https://gitter.im/numenta/htm.java?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge) [![OpenHub](https://www.openhub.net/p/htm-java/widgets/project_thin_badge.gif)](https://www.openhub.net/p/htm-java)
+=======
+[![htm.java awesomeness](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](http://cogmission.ai) [![AGI Probability](https://img.shields.io/badge/AGI%20Probability-97%25-blue.svg)](http://numenta.com/#hero) [![Coolness Factor](https://img.shields.io/badge/Coolness%20Factor-100%25-blue.svg)](https://github.com/numenta/htm.java-examples) [![Build Status](https://travis-ci.org/numenta/htm.java.png?branch=master)](https://travis-ci.org/numenta/htm.java) [![Coverage Status](https://coveralls.io/repos/numenta/htm.java/badge.svg?branch=master&service=github)](https://coveralls.io/github/numenta/htm.java?branch=master) [![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.numenta/htm.java/badge.svg)](https://maven-badges.herokuapp.com/maven-central/org.numenta/htm.java) [![][license img]][license] [![docs-badge][]][docs] [![Gitter](https://img.shields.io/badge/gitter-join_chat-green.svg?style=flat)](https://gitter.im/numenta/htm.java?utm_source=badge) [![OpenHub](https://www.openhub.net/p/htm-java/widgets/project_thin_badge.gif)](https://www.openhub.net/p/htm-java)
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
 
 <br>
 
@@ -26,6 +30,7 @@ _**NOTE: Minimum JavaSE version is 8**_
 <br>
 
 ## Recent News Items...
+<<<<<<< HEAD
 * HTM.Java Release v0.6.11-alpha to tag sync state with NuPIC (10/16/2016)
 * [HTM.Java Receives new TemporalMemory](https://discourse.numenta.org/t/htm-java-now-in-sync-with-nupic/1510) - HTM.Java now fully in sync!! (10/13/2016)
 * [HTM.Java Receives new SpatialPooler](https://github.com/numenta/htm.java/pull/486) - Fully Updated! (10/06/2016)
@@ -37,13 +42,28 @@ _**NOTE: Minimum JavaSE version is 8**_
 * [HTM.java Recieves new Persistence API](https://github.com/numenta/htm.java/wiki/Saving-Your-Network:-The-Persistence-API) (04/14/2016)
 * HTM.java Recieves [Docker Reference-Build Implementation](https://github.com/numenta/htm.java/wiki/Build-Instructions#reference-build-environment) (03/26/2016)  
 * **HTM.java Becomes Build-able With OpenJDK** (03/26/2016)  
+=======
+* Updated [Sync Report Table](https://github.com/numenta/htm.java/blob/master/README.md#versioning) Here in README (06/02/2017)
+* New Hot Fix Release [v0.6.13-alpha](https://github.com/numenta/htm.java/releases) (05/12/2017)
+* Updated HTM.Java Examples! [Now in sync with latest release (v0.6.12-alpha)](https://github.com/numenta/htm.java-examples) (See the executable Jars!) (04/06/2017)
+* New Feature Release! [v0.6.12-alpha](https://github.com/numenta/htm.java/releases/tag/v0.6.12-alpha) Network API Allows Multi-field inference! (04/04/2017)
+* HTM.Java Release v0.6.11-alpha to tag sync state with NuPIC (10/16/2016)
+* [HTM.Java Receives new TemporalMemory](https://discourse.numenta.org/t/htm-java-now-in-sync-with-nupic/1510) - HTM.Java now fully in sync!! (10/13/2016)
+* [HTM.Java Receives new SpatialPooler](https://github.com/numenta/htm.java/pull/486) - Fully Updated! (10/06/2016)
+* HTM.Java Reaches 100% NuPIC Compatibility and operation within NAB <strike>will be offered (soon)</strike>! (09/29/2016)
+* [HTM.java Receives New SDRClassifier!](https://github.com/numenta/htm.java/blob/master/src/main/java/org/numenta/nupic/algorithms/SDRClassifier.java) (07/26/2016)
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
 
 
 ### [News Archives...](https://github.com/numenta/htm.java/wiki/News-Archives...)
 * See a glimpse of htm.java's history and read about significant events in its development.  
 
 
+<<<<<<< HEAD
 ### View the [Change Log](https://github.com/numenta/htm.java/blob/master/CHANGELOG.md) (Updated! 2016-10-13)
+=======
+### View the [Change Log](https://github.com/numenta/htm.java/blob/master/CHANGELOG.md) (Updated! 2017-04-05)
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
 * Change log itemizes the release history.
 * Contains an **"Unreleased" section** which lists changes coming in the next release as they're being worked on - (should help users keep in touch with the current evolution of htm.java)
 
@@ -76,7 +96,11 @@ See the blog: [Join the Cogmission](http://www.cogmission.ai)
 | Core Algorithm  | NuPIC Date    |HTM.Java Date | Latest NuPIC SHA | Latest HTM.Java SHA | Status|
 | --------------- |:-------------:|:------------:|:----------------:|:-------------------:|:-----:|
 | SpatialPooler   | 2016-12-11    | 2016-10-07   |[commit](https://github.com/numenta/nupic/commit/5c3edead9526d3b5fb6a4f37ad9d38cdcf32f5ff)|[commit](https://github.com/numenta/htm.java/commit/2cdcee1fcc5f6c18c2c48b4b553c49879c1256bb#diff-22f96ea06fd0c2b3593c755cbccf0a8b)| [*Behind NuPIC Merge #3411](https://github.com/numenta/nupic/pull/3411)
+<<<<<<< HEAD
 | TemporalMemory  | 2016-09-23    | 2016-10-13   |[commit](https://github.com/numenta/nupic/commit/1036f25e7223471d72cebc536d6734f78d37b6c7)|[commit](https://github.com/numenta/htm.java/commit/7f4d8f2e2c910dd662909442546516e36adfc7cc)| Sync'd*
+=======
+| TemporalMemory  | 2017-06-02    | 2016-10-13   |[commit](https://github.com/numenta/nupic/commit/b1f35fe15a1cbed689d1173cfcecddfab781baab)|[commit](https://github.com/numenta/htm.java/commit/7f4d8f2e2c910dd662909442546516e36adfc7cc)| [*Behind NuPIC Merge #3654](https://github.com/numenta/nupic/pull/3654)
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
 
 \* May be one of: "Sync'd" or "Behind". "Behind" expresses a temporary lapse in synchronization while devs are implementing new changes.
 
@@ -91,7 +115,11 @@ The primary goal of this library development is to provide a Java version of NuP
 
 By working closely with Numenta and receiving their enthusiastic support and guidance, it is intended that this library be maintained as a viable Java language alternative to Numenta's C++ and Python offerings. However it must be understood that "official" support is (for the time being) currently limited to community resources such as the maintainers of this library and Numenta Forums / Message Lists and IRC:
 
+<<<<<<< HEAD
  * [NuPIC Community](http://numenta.org/index.html#community)
+=======
+ * [NuPIC Community](http://numenta.org/)
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
  * [New HTM Forum](http://discourse.numenta.org)
 
 ***
@@ -126,13 +154,17 @@ gradle check  # Executes the tests and runs the benchmarks
 
 --or--
 
-gradle -Pskipbench check  # Executes the tests w/o running the benchmarks
+gradle -Pskipbench check  # Executes the tests w/o running the benchmarks  (Faster! **Recommended**)
 ```
 **Note:** Info on installing **gradle** can be found on the wiki (look at #3.) [here](https://github.com/numenta/htm.java/wiki/Eclipse-Setup-Tips)
 
 **Linux Gradle Issues?** [see the wiki here.](https://github.com/numenta/htm.java/wiki/Gradle---JAVA_HOME-Issue-Resolution)
 
+<<<<<<< HEAD
 **A [wiki](https://github.com/numenta/htm.java/wiki/Build-Instructions) with full build instructions for building HTM.java is available here:** [Build Instructions](https://github.com/numenta/htm.java/wiki/Build-Instructions) (This includes a no-java/gradle-guaranteed-build using the provided [Docker File](https://github.com/numenta/htm.java/blob/master/Dockerfile) as a reference build.) 
+=======
+**A [wiki](https://github.com/numenta/htm.java/wiki/Build-Instructions) with full build instructions for building HTM.java is available here:** [Build Instructions](https://github.com/numenta/htm.java/wiki/Build-Instructions) 
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
 
 ***
 ## For Developers: Usage & Project Integration  
@@ -151,7 +183,11 @@ gradle -Pskipbench check  # Executes the tests w/o running the benchmarks
 Gradle:  
 
 dependencies {
+<<<<<<< HEAD
     compile group: 'org.numenta', name: 'htm.java', version:'0.6.11'
+=======
+    compile group: 'org.numenta', name: 'htm.java', version:'0.6.12'
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
 }
 ```
 
@@ -161,7 +197,11 @@ Maven:
 <dependency>
     <groupId>org.numenta</groupId>
     <artifactId>htm.java</artifactId>
+<<<<<<< HEAD
     <version>0.6.11</version>
+=======
+    <version>0.6.12</version>
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
 </dependency>
 ```
 
@@ -171,7 +211,11 @@ How to get the latest SNAPSHOT build: (None yet for newest build...)
 <dependency>
     <groupId>org.numenta</groupId>
     <artifactId>htm.java</artifactId>
+<<<<<<< HEAD
     <version>0.6.12-SNAPSHOT</version>
+=======
+    <version>0.6.13-SNAPSHOT</version>
+>>>>>>> 8fc6b596461a879fdf3e8936833c9a972d858b57
 </dependency>
 
 You also may need to include a repositories entry:
